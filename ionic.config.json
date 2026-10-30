@@ -1,0 +1,7 @@
+{
+  "name": "elva_gestion",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

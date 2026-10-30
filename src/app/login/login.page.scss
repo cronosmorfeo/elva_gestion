@@ -1,0 +1,129 @@
+// Paleta de colores basada en la identidad visual proporcionada
+$primary-color: #008f82;   // Verde turquesa de fondo principal
+$primary-dark: #00756a;    // Tono más oscuro para estados active
+$accent-color: #5ce1e6;    // Celeste brillante para detalles y acentos
+$text-light: #ffffff;      // Blanco puro
+$input-bg: rgba(255, 255, 255, 0.1); // Fondo translúcido moderno para inputs
+
+.login-content {
+  --background: #{$primary-color};
+  --ion-text-color: #{$text-light};
+}
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100%;
+  padding: 2rem 1.5rem;
+  max-width: 420px;
+  margin: 0 auto;
+
+  // Sección del Logo y Títulos
+  .logo-section {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    width: 100%;
+
+    .logo-wrapper {
+      width: 90px;
+      height: 90px;
+      margin: 0 auto 1rem auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+      .brand-logo {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+      }
+    }
+
+    .brand-title {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: $text-light;
+      margin: 0;
+    }
+
+    .brand-subtitle {
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.75);
+      margin-top: 0.4rem;
+      font-weight: 400;
+    }
+  }
+
+  // Sección del Formulario
+  .form-section {
+    width: 100%;
+
+    .input-group {
+      margin-bottom: 1.25rem;
+
+      label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 0.5rem;
+        margin-left: 0.25rem;
+      }
+
+      .custom-input-item {
+        --background: #{$input-bg};
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding-left: 12px;
+        transition: all 0.3s ease;
+
+        &:focus-within {
+          border-color: $accent-color;
+          box-shadow: 0 0 0 3px rgba(92, 225, 230, 0.2);
+          --background: rgba(255, 255, 255, 0.15);
+        }
+
+        ion-icon {
+          color: $accent-color;
+          font-size: 1.2rem;
+          margin-right: 8px;
+        }
+
+        ion-input {
+          --color: #{$text-light};
+          --placeholder-color: rgba(255, 255, 255, 0.4);
+          font-size: 0.95rem;
+        }
+      }
+    }
+
+    // Botón de Envío
+    .button-container {
+      margin-top: 2rem;
+
+      .submit-btn {
+        --background: #{$text-light};
+        --color: #{$primary-color};
+        --border-radius: 14px;
+        --box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        font-weight: 700;
+        font-size: 1rem;
+        height: 50px;
+        letter-spacing: 0.5px;
+        text-transform: none;
+        transition: transform 0.2s ease;
+
+        &:active {
+          transform: scale(0.98);
+        }
+      }
+    }
+  }
+}

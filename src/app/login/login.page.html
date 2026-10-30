@@ -1,0 +1,46 @@
+<ion-content [fullscreen]="true" class="login-content">
+  <div class="login-container">
+    
+    <!-- Sección del Logo -->
+    <div class="logo-section">
+      <div class="logo-wrapper">
+        <img src="assets/icon/logo.png" alt="ELVA Logo" class="brand-logo" />
+      </div>
+      <h1 class="brand-title">ELVA Gestion</h1>
+      <p class="brand-subtitle">Bienvenido de nuevo</p>
+    </div>
+
+    <!-- Formulario de Acceso -->
+    <div class="form-section">
+      <form>
+        
+        <!-- Campo Correo -->
+        <div class="input-group">
+          <label>Correo electrónico</label>
+          <ion-item lines="none" class="custom-input-item">
+            <ion-icon name="mail-outline" slot="start"></ion-icon>
+            <ion-input type="email" placeholder="usuario@correo.com" required></ion-input>
+          </ion-item>
+        </div>
+
+        <!-- Campo Contraseña -->
+        <div class="input-group">
+          <label>Contraseña</label>
+          <ion-item lines="none" class="custom-input-item">
+            <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
+            <ion-input type="password" placeholder="••••••••" required></ion-input>
+          </ion-item>
+        </div>
+
+        <!-- Botón de Iniciar Sesión -->
+        <div class="button-container">
+          <ion-button expand="block" class="submit-btn" type="submit">
+            Iniciar Sesión
+          </ion-button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</ion-content>

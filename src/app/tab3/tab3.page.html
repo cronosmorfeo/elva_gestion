@@ -1,15 +1,347 @@
-<ion-header [translucent]="true">
+
+<ion-header class="admin-header">
   <ion-toolbar>
-    <ion-title> Tab 3 </ion-title>
+    <ion-title>
+      <div class="header-title">
+        <ion-icon name="people-circle-outline"></ion-icon>
+        Administración de usuarios
+      </div>
+    </ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Tab 3</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content [fullscreen]="true" class="admin-content">
 
-  <app-explore-container name="Tab 3 page"></app-explore-container>
+  <div class="admin-container">
+
+    <!-- Encabezado -->
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">GESTIÓN DEL SISTEMA</span>
+        <h1>Usuarios</h1>
+        <p>Registra y administra los usuarios de la plataforma.</p>
+      </div>
+
+      <div class="heading-icon">
+        <ion-icon name="people-outline"></ion-icon>
+      </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="stats-grid">
+
+      <div class="stat-card">
+        <div class="stat-icon users">
+          <ion-icon name="people-outline"></ion-icon>
+        </div>
+
+        <div>
+          <span>Total de usuarios</span>
+          <h2>128</h2>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon active">
+          <ion-icon name="person-add-outline"></ion-icon>
+        </div>
+
+        <div>
+          <span>Usuarios nuevos</span>
+          <h2>12</h2>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Formulario -->
+    <div class="form-card">
+
+      <div class="form-heading">
+
+        <div class="form-heading-icon">
+          <ion-icon name="person-add-outline"></ion-icon>
+        </div>
+
+        <div>
+          <h2>Crear nuevo usuario</h2>
+          <p>Completa la información para registrar un nuevo colaborador.</p>
+        </div>
+
+      </div>
+
+      <form (ngSubmit)="crearColaborador()" #colaboradorForm="ngForm">
+
+        <!-- INFORMACIÓN PERSONAL -->
+        <div class="section-title">
+          <ion-icon name="person-outline"></ion-icon>
+          Información personal
+        </div>
+
+        <div class="form-grid">
+
+          <!-- Nombre -->
+          <div class="form-field full-width">
+            <ion-label>Nombre completo *</ion-label>
+
+            <ion-input
+              name="nombre"
+              type="text"
+              placeholder="Ej. Juan Pérez"
+              fill="outline"
+              [(ngModel)]="colaborador.nombre"
+              required
+              minlength="3">
+            </ion-input>
+          </div>
+
+          <!-- País -->
+          <div class="form-field">
+            <ion-label>País *</ion-label>
+
+            <ion-select
+              name="pais"
+              interface="popover"
+              placeholder="Seleccionar país"
+              fill="outline"
+              [(ngModel)]="colaborador.pais"
+              required>
+
+              <ion-select-option value="CR">Costa Rica</ion-select-option>
+              <ion-select-option value="PA">Panamá</ion-select-option>
+              <ion-select-option value="GT">Guatemala</ion-select-option>
+              <ion-select-option value="SV">El Salvador</ion-select-option>
+              <ion-select-option value="HN">Honduras</ion-select-option>
+              <ion-select-option value="NI">Nicaragua</ion-select-option>
+              <ion-select-option value="MX">México</ion-select-option>
+              <ion-select-option value="US">Estados Unidos</ion-select-option>
+              <ion-select-option value="CO">Colombia</ion-select-option>
+
+            </ion-select>
+          </div>
+
+          <!-- Fecha de ingreso -->
+          <div class="form-field">
+            <ion-label>Fecha de ingreso *</ion-label>
+
+            <ion-input
+              name="fechaIngreso"
+              type="date"
+              fill="outline"
+              [(ngModel)]="colaborador.fechaIngreso"
+              required>
+            </ion-input>
+          </div>
+
+        </div>
+
+        <!-- INFORMACIÓN SALARIAL -->
+        <div class="section-title">
+          <ion-icon name="wallet-outline"></ion-icon>
+          Información salarial
+        </div>
+
+        <div class="form-grid">
+
+          <!-- Salario -->
+          <div class="form-field">
+            <ion-label>Salario *</ion-label>
+
+            <ion-input
+              name="salario"
+              type="number"
+              placeholder="0.00"
+              fill="outline"
+              [(ngModel)]="colaborador.salario"
+              min="0"
+              required>
+            </ion-input>
+          </div>
+
+          <!-- Moneda -->
+          <div class="form-field">
+            <ion-label>Moneda *</ion-label>
+
+            <ion-select
+              name="moneda"
+              interface="popover"
+              placeholder="Seleccionar moneda"
+              fill="outline"
+              [(ngModel)]="colaborador.moneda"
+              required>
+
+              <ion-select-option value="CRC">
+                CRC - Colón costarricense
+              </ion-select-option>
+
+              <ion-select-option value="USD">
+                USD - Dólar estadounidense
+              </ion-select-option>
+
+              <ion-select-option value="EUR">
+                EUR - Euro
+              </ion-select-option>
+
+              <ion-select-option value="MXN">
+                MXN - Peso mexicano
+              </ion-select-option>
+
+              <ion-select-option value="COP">
+                COP - Peso colombiano
+              </ion-select-option>
+
+              <ion-select-option value="PAB">
+                PAB - Balboa panameño
+              </ion-select-option>
+
+            </ion-select>
+          </div>
+
+        </div>
+
+        <!-- JORNADA LABORAL -->
+        <div class="section-title">
+          <ion-icon name="time-outline"></ion-icon>
+          Jornada laboral
+        </div>
+
+        <div class="form-grid">
+
+          <!-- Jornada -->
+          <div class="form-field">
+            <ion-label>Jornada *</ion-label>
+
+            <ion-select
+              name="jornada"
+              interface="popover"
+              placeholder="Seleccionar jornada"
+              fill="outline"
+              [(ngModel)]="colaborador.jornada"
+              required>
+
+              <ion-select-option value="completa">
+                Tiempo completo
+              </ion-select-option>
+
+              <ion-select-option value="medio">
+                Medio tiempo
+              </ion-select-option>
+
+              <ion-select-option value="parcial">
+                Jornada parcial
+              </ion-select-option>
+
+              <ion-select-option value="nocturna">
+                Jornada nocturna
+              </ion-select-option>
+
+              <ion-select-option value="flexible">
+                Horario flexible
+              </ion-select-option>
+
+            </ion-select>
+          </div>
+
+          <!-- Horario -->
+          <div class="form-field">
+            <ion-label>Horario laborado *</ion-label>
+
+            <ion-input
+              name="horarioLaborado"
+              type="text"
+              placeholder="Ej. 8:00 AM - 5:00 PM"
+              fill="outline"
+              [(ngModel)]="colaborador.horarioLaborado"
+              required>
+            </ion-input>
+          </div>
+
+        </div>
+
+        <!-- CREDENCIALES -->
+        <div class="section-title">
+          <ion-icon name="shield-checkmark-outline"></ion-icon>
+          Credenciales de acceso
+        </div>
+
+        <div class="form-grid">
+
+          <!-- Correo -->
+          <div class="form-field full-width">
+            <ion-label>Correo electrónico *</ion-label>
+
+            <ion-input
+              name="correo"
+              type="email"
+              placeholder="usuario@empresa.com"
+              fill="outline"
+              [(ngModel)]="colaborador.correo"
+              email
+              required>
+            </ion-input>
+          </div>
+
+          <!-- Password -->
+          <div class="form-field full-width">
+            <ion-label>Contraseña *</ion-label>
+
+            <ion-input
+              name="password"
+              type="password"
+              placeholder="Mínimo 6 caracteres"
+              fill="outline"
+              [(ngModel)]="colaborador.password"
+              minlength="6"
+              required>
+            </ion-input>
+          </div>
+
+        </div>
+
+        <!-- ACCIONES -->
+        <div class="form-actions">
+
+          <ion-button
+            fill="clear"
+            color="medium"
+            type="button"
+            [disabled]="guardando"
+            (click)="limpiarFormulario()">
+
+            Cancelar
+
+          </ion-button>
+
+          <ion-button
+            type="submit"
+            class="create-button"
+            [disabled]="guardando || colaboradorForm.invalid">
+
+            <ion-icon
+              name="person-add-outline"
+              slot="start"
+              *ngIf="!guardando">
+            </ion-icon>
+
+            <ion-spinner
+              name="crescent"
+              *ngIf="guardando">
+            </ion-spinner>
+
+            {{ guardando ? 'Creando usuario...' : 'Crear usuario' }}
+
+          </ion-button>
+
+        </div>
+
+        <p class="form-required-note">
+          * Todos los campos son obligatorios.
+        </p>
+
+      </form>
+
+    </div>
+
+  </div>
+
 </ion-content>

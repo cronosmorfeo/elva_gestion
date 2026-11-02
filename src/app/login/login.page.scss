@@ -99,6 +99,9 @@ $input-bg: rgba(255, 255, 255, 0.1); // Fondo translúcido moderno para inputs
         ion-input {
           --color: #{$text-light};
           --placeholder-color: rgba(255, 255, 255, 0.4);
+          // Cursor blanco al escribir (Ionic usa el color de resaltado)
+          --highlight-color-focused: #{$text-light};
+          --highlight-color-valid: #{$text-light};
           font-size: 0.95rem;
         }
       }

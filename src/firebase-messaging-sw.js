@@ -2,13 +2,8 @@
 importScripts('https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js');
 
-firebase.initializeApp({
-  apiKey: 'AIzaSyCRSOFl5Ce_Khi_8x1onM24yXAsib9i6rM',
-  authDomain: 'elva-gestion.firebaseapp.com',
-  projectId: 'elva-gestion',
-  messagingSenderId: '959436608336',
-  appId: '1:959436608336:web:74badcd02db056c172d255',
-});
+// The config comes from the registration URL (see PushNotificationService), so no keys live here.
+firebase.initializeApp(Object.fromEntries(new URL(self.location.href).searchParams));
 
 const messaging = firebase.messaging();
 

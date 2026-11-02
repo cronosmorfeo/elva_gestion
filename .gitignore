@@ -77,3 +77,7 @@ Thumbs.db
 
 firebase.json
 .firebaserc
+
+# Firebase config: each developer keeps their own (copy environment.example.ts)
+/src/environments/environment.ts
+/src/environments/environment.prod.ts

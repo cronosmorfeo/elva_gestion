@@ -35,7 +35,9 @@ export class PushNotificationService {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return 'denied';
 
-    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    const { apiKey, authDomain, projectId, messagingSenderId, appId } = environment.firebase;
+    const config = new URLSearchParams({ apiKey, authDomain, projectId, messagingSenderId, appId });
+    const registration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${config}`);
     this.messaging = getMessaging(this.app);
 
     let token: string;

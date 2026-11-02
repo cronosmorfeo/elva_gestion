@@ -7,9 +7,9 @@ import { PushNotificationService } from '../services/push-notification.service';
 
 const STATUS_TEXT: Record<PushResult, string> = {
   enabled: 'Avisos activados',
-  denied: 'Permiso rechazado. Activalo desde el candado de la barra de direcciones.',
+  denied: 'Permiso rechazado. Puede activarlo desde el candado de la barra de direcciones.',
   unsupported: 'Este navegador no soporta avisos.',
-  blocked: 'Tu navegador bloquea los avisos (por ejemplo, Brave). Activalos en su configuración o usá Chrome.',
+  blocked: 'Su navegador bloquea los avisos (por ejemplo, Brave). Actívelos en la configuración o use Chrome.',
 };
 
 // TEMP: push test page with anonymous auth until the login is wired up.
@@ -42,8 +42,8 @@ export class Tab2Page {
       console.error(err);
       this.status.set(
         err instanceof Error && err.message === 'push-timeout'
-          ? 'No se pudo activar a tiempo. Revisá tu conexión e intentá de nuevo.'
-          : 'No se pudieron activar los avisos. Intentá de nuevo.',
+          ? 'No se pudo activar a tiempo. Revise su conexión e intente de nuevo.'
+          : 'No se pudieron activar los avisos. Intente de nuevo.',
       );
     }
   }

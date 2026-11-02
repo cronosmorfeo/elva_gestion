@@ -1,15 +1,17 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title> Tab 2 </ion-title>
+    <ion-title>Prueba de avisos</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Tab 2</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content [fullscreen]="true" class="ion-padding">
+  <ion-button (click)="activate()">Activar avisos</ion-button>
+  <p><strong>Estado:</strong> {{ status() }}</p>
 
-  <app-explore-container name="Tab 2 page"></app-explore-container>
+  @if (token()) {
+  <p><strong>Token de este dispositivo</strong> (solo para la prueba, no lo comparta):</p>
+  <p style="word-break: break-all; font-family: monospace; font-size: 12px">{{ token() }}</p>
+  } @if (lastMessage()) {
+  <p><strong>Último aviso con la página abierta:</strong> {{ lastMessage() }}</p>
+  }
 </ion-content>

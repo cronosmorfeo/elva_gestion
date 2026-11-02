@@ -63,7 +63,7 @@ export class PushNotificationService {
     onMessage(this.messaging, (payload) => {
       const d = payload.data ?? {};
       this.foregroundMessages$.next({
-        title: payload.notification?.title ?? d['title'] ?? 'ELVA Gestion',
+        title: payload.notification?.title ?? d['title'] ?? 'ELVA Gestión',
         body: payload.notification?.body ?? d['body'] ?? '',
         url: d['url'] ?? '/',
       });

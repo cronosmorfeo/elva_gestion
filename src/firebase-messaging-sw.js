@@ -16,7 +16,7 @@ messaging.onBackgroundMessage((payload) => {
   // Notification payloads are shown by the SDK itself.
   if (payload.notification) return;
   const data = payload.data || {};
-  self.registration.showNotification(data.title || 'ELVA Gestion', {
+  self.registration.showNotification(data.title || 'ELVA Gestión', {
     body: data.body || '',
     icon: '/assets/icon/favicon.png',
     data: { url: data.url || '/' },

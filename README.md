@@ -139,6 +139,7 @@ The service worker holds no credentials: it receives them in its URL when regist
 
 - **Credentials:** `environment.ts` and `environment.prod.ts` are not committed (see [Getting started](#getting-started)).
 - **Firestore rules:** the repository's `firestore.rules` allows all reads and writes (`allow read, write: if true`). It is for development only. **Before loading real data**, publish rules that restrict access by user and role, since `colaboradores` stores salaries.
+- **Sign-in:** for now the navbar and the vacation page are visible without signing in. `authGuard` in `src/app/auth` is ready and will be connected once the login works.
 - **Anonymous sign-in:** disable it in Firebase once the push test page is removed.
 - **Notifications:** notification text must not include sensitive data, because it shows on the lock screen.
 

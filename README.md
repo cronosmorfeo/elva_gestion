@@ -6,8 +6,8 @@ Internal Human Resources app for ELVA IA. Employees submit requests (vacation an
 
 | Section | Route | What it does |
 | --- | --- | --- |
-| Home (Inicio) | `/tabs/inicio` | Main menu. "Solicitar vacaciones" works; the other options are marked as coming soon. |
-| Vacation request | `/tabs/inicio/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. The balance is example data and requests are not saved yet. |
+| Navbar | Top of every page | Main menu. "Vacaciones" works; the other options are marked as coming soon. Not hidden before sign-in yet. |
+| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. The balance is example data and requests are not saved yet. |
 | Login (Tab 1) | `/tabs/login` | Sign-in screen with the ELVA logo. Not yet connected to Firebase Authentication. |
 | Push test (Tab 2) | `/tabs/tab2` | **Temporary** page to test push notifications with an anonymous user. To be replaced once the login is connected. |
 | Users (Tab 3) | `/tabs/tab3` | Admin panel to create employees in Firebase Authentication and Firestore. |
@@ -96,8 +96,8 @@ src/
 ├── assets/icon/logo.png           # ELVA logo
 └── app/
     ├── app.routes.ts              # Main routes
-    ├── tabs/                      # Tab bar and its routes
-    ├── home/                      # Home menu (Inicio tab)
+    ├── tabs/                      # Tab bar, navbar and their routes
+    ├── auth/                      # Sign-in guard (not connected yet)
     ├── vacation-request/          # Vacation request page and Costa Rica holidays
     ├── login/                     # Sign-in screen (Tab 1)
     ├── tab2/                      # Push test page, temporary (Tab 2)
@@ -139,6 +139,7 @@ The service worker holds no credentials: it receives them in its URL when regist
 
 - **Credentials:** `environment.ts` and `environment.prod.ts` are not committed (see [Getting started](#getting-started)).
 - **Firestore rules:** the repository's `firestore.rules` allows all reads and writes (`allow read, write: if true`). It is for development only. **Before loading real data**, publish rules that restrict access by user and role, since `colaboradores` stores salaries.
+- **Sign-in:** for now the navbar and the vacation page are visible without signing in. `authGuard` in `src/app/auth` is ready and will be connected once the login works.
 - **Anonymous sign-in:** disable it in Firebase once the push test page is removed.
 - **Notifications:** notification text must not include sensitive data, because it shows on the lock screen.
 

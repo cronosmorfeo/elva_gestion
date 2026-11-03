@@ -1,1 +1,77 @@
+// The header sits above the tabs, so the tabs take the remaining height.
+ion-tabs {
+  position: relative;
+  flex: 1;
+}
 
+.navbar {
+  --background: #006b62;
+  --color: #ffffff;
+}
+
+.navbar-content {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0 0.75rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  font-weight: 800;
+
+  img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+}
+
+.links {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  a,
+  .soon {
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    font-size: 0.9rem;
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  a:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  a.active {
+    background: rgba(255, 255, 255, 0.2);
+    font-weight: 700;
+  }
+
+  a:focus-visible {
+    outline: 2px solid #5ce1e6;
+  }
+
+  .soon {
+    opacity: 0.55;
+    cursor: default;
+
+    small {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .brand-name {
+    display: none;
+  }
+}

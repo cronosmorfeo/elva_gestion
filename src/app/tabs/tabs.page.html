@@ -1,3 +1,20 @@
+<ion-header>
+  <ion-toolbar class="navbar">
+    <nav class="navbar-content" aria-label="Menú principal">
+      <span class="brand">
+        <img src="assets/icon/logo.png" alt="" />
+        <span class="brand-name">ELVA Gestión</span>
+      </span>
+      <div class="links">
+        <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
+        @for (item of comingSoon; track item) {
+        <span class="soon" aria-disabled="true" title="Próximamente">{{ item }} <small>Pronto</small></span>
+        }
+      </div>
+    </nav>
+  </ion-toolbar>
+</ion-header>
+
 <ion-tabs>
   <ion-tab-bar slot="bottom">
     <ion-tab-button tab="login" href="/tabs/login">

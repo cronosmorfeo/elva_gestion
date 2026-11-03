@@ -1,8 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { IonButton, IonContent, IonIcon, IonInput, IonTextarea, ToastController } from '@ionic/angular';
-import { addIcons } from 'ionicons';
-import { arrowBackOutline } from 'ionicons/icons';
+import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 
 import { holidaysBetween } from './holidays';
 import type { VacationDay } from './vacation-days';
@@ -18,7 +15,7 @@ const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', '
   selector: 'app-vacation-request',
   templateUrl: 'vacation-request.page.html',
   styleUrls: ['vacation-request.page.scss'],
-  imports: [IonContent, IonInput, IonTextarea, IonButton, IonIcon, RouterLink],
+  imports: [IonContent, IonInput, IonTextarea, IonButton],
 })
 export class VacationRequestPage {
   private readonly toast = inject(ToastController);
@@ -49,10 +46,6 @@ export class VacationRequestPage {
   });
 
   readonly canSubmit = computed(() => this.days().length > 0 && !this.error());
-
-  constructor() {
-    addIcons({ arrowBackOutline });
-  }
 
   setStart(value: string | null | undefined): void {
     this.start.set(value ?? '');

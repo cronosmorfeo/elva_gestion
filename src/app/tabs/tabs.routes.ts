@@ -1,7 +1,5 @@
 import type { Routes } from '@angular/router';
 
-import { authGuard } from '../auth/auth.guard';
-
 import { TabsPage } from './tabs.page';
 
 export const routes: Routes = [
@@ -23,7 +21,7 @@ export const routes: Routes = [
       },
       {
         path: 'vacaciones',
-        canActivate: [authGuard],
+        // TODO: add canActivate: [authGuard] (../auth/auth.guard) once the login is connected.
         loadComponent: () => import('../vacation-request/vacation-request.page').then((m) => m.VacationRequestPage),
       },
       {

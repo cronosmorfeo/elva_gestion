@@ -14,7 +14,7 @@ export class TabsPage {
   public environmentInjector = inject(EnvironmentInjector);
 
   // TODO: show the navbar only after sign-in (isSignedIn in ../auth/auth.guard).
-  readonly comingSoon = ['Horas extra', 'Mis solicitudes', 'Avisos'];
+  readonly comingSoon = ['Mis solicitudes', 'Avisos'];
 
   constructor() {
     addIcons({ triangle, ellipse, square });

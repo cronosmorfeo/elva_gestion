@@ -25,6 +25,11 @@ export const routes: Routes = [
         loadComponent: () => import('../vacation-request/vacation-request.page').then((m) => m.VacationRequestPage),
       },
       {
+        path: 'horas-extra',
+        // TODO: add canActivate: [authGuard] (../auth/auth.guard) once the login is connected.
+        loadComponent: () => import('../overtime-request/overtime-request.page').then((m) => m.OvertimeRequestPage),
+      },
+      {
         path: '',
         redirectTo: '/tabs/login',
         pathMatch: 'full',

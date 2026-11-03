@@ -6,8 +6,9 @@ Internal Human Resources app for ELVA IA. Employees submit requests (vacation an
 
 | Section | Route | What it does |
 | --- | --- | --- |
-| Navbar | Top of every page | Main menu. "Vacaciones" works; the other options are marked as coming soon. Not hidden before sign-in yet. |
+| Navbar | Top of every page | Main menu. "Vacaciones" and "Horas extra" work; the other options are marked as coming soon. Not hidden before sign-in yet. |
 | Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. The balance is example data and requests are not saved yet. |
+| Overtime request | `/tabs/horas-extra` | Pick a start and end (it can cross midnight), describe the work and see the hours per day with their pay rate. Requests are not saved yet. |
 | Login (Tab 1) | `/tabs/login` | Sign-in screen with the ELVA logo. Not yet connected to Firebase Authentication. |
 | Push test (Tab 2) | `/tabs/tab2` | **Temporary** page to test push notifications with an anonymous user. To be replaced once the login is connected. |
 | Users (Tab 3) | `/tabs/tab3` | Admin panel to create employees in Firebase Authentication and Firestore. |
@@ -99,6 +100,7 @@ src/
     ├── tabs/                      # Tab bar, navbar and their routes
     ├── auth/                      # Sign-in guard (not connected yet)
     ├── vacation-request/          # Vacation request page and Costa Rica holidays
+    ├── overtime-request/          # Overtime request page
     ├── login/                     # Sign-in screen (Tab 1)
     ├── tab2/                      # Push test page, temporary (Tab 2)
     ├── tab3/                      # Users panel (Tab 3)
@@ -126,6 +128,12 @@ The service worker holds no credentials: it receives them in its URL when regist
 
 - Weekends and mandatory Costa Rica holidays are not deducted. Optional holidays (Aug 2, Aug 31, Dec 1) are deducted, pending HR confirmation.
 - Holidays are calculated for any year, including Holy Thursday and Good Friday. Holidays moved by law go in `MOVED_HOLIDAYS` in `holidays.ts`.
+
+## Overtime hours
+
+- Requests can only start today or later. A request that crosses midnight is split by calendar day.
+- Workdays and optional holidays pay 1.5x. Sundays and mandatory holidays pay double up to an 8-hour shift, then triple. Whether Saturday is also a rest day is pending HR confirmation (`REST_WEEKDAYS` in `overtime-hours.ts`).
+- Shift plus overtime cannot exceed 12 hours a day, so a workday allows up to 4 overtime hours and a rest day up to 12.
 - A request can cover up to one year.
 
 ## Firestore data
@@ -139,7 +147,7 @@ The service worker holds no credentials: it receives them in its URL when regist
 
 - **Credentials:** `environment.ts` and `environment.prod.ts` are not committed (see [Getting started](#getting-started)).
 - **Firestore rules:** the repository's `firestore.rules` allows all reads and writes (`allow read, write: if true`). It is for development only. **Before loading real data**, publish rules that restrict access by user and role, since `colaboradores` stores salaries.
-- **Sign-in:** for now the navbar and the vacation page are visible without signing in. `authGuard` in `src/app/auth` is ready and will be connected once the login works.
+- **Sign-in:** for now the navbar and the request pages are visible without signing in. `authGuard` in `src/app/auth` is ready and will be connected once the login works.
 - **Anonymous sign-in:** disable it in Firebase once the push test page is removed.
 - **Notifications:** notification text must not include sensitive data, because it shows on the lock screen.
 

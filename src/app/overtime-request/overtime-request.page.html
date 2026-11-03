@@ -1,0 +1,68 @@
+<ion-content [fullscreen]="true" class="overtime-content">
+  <div class="overtime-container">
+    <h1>Solicitar horas extra</h1>
+    <p class="intro">
+      Elija cuándo empieza y cuándo termina, y explique qué va a hacer. RH revisa la solicitud antes de la aprobación
+      final.
+    </p>
+
+    <form class="form" (submit)="$event.preventDefault(); submit()">
+      <div class="dates">
+        <ion-input
+          type="datetime-local"
+          label="Inicio"
+          labelPlacement="stacked"
+          fill="outline"
+          [min]="minStart"
+          [value]="start()"
+          (ionInput)="setStart($event.detail.value)"
+        ></ion-input>
+        <ion-input
+          type="datetime-local"
+          label="Fin"
+          labelPlacement="stacked"
+          fill="outline"
+          [min]="start() || minStart"
+          [value]="end()"
+          (ionInput)="setEnd($event.detail.value)"
+        ></ion-input>
+      </div>
+
+      <ion-textarea
+        label="¿Qué va a hacer en esas horas?"
+        labelPlacement="stacked"
+        fill="outline"
+        [autoGrow]="true"
+        [maxlength]="300"
+        [value]="task()"
+        (ionInput)="setTask($event.detail.value)"
+      ></ion-textarea>
+
+      @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+      } @if (days().length > 0) {
+      <section class="summary" aria-label="Resumen de la solicitud">
+        <div class="totals">
+          <span>Total</span>
+          <strong>{{ totalText() }}</strong>
+        </div>
+
+        <ul class="day-list">
+          @for (row of dayRows(); track row.key) {
+          <li [class]="row.kind">
+            <span class="weekday">{{ row.weekday }}</span>
+            <span class="date">{{ row.date }}</span>
+            <span class="status">{{ row.status }}</span>
+          </li>
+          }
+        </ul>
+        <p class="note">1.5x en día normal. En domingo o feriado obligatorio: doble hasta 8 h, triple después.</p>
+      </section>
+      }
+
+      <ion-button expand="block" type="submit" class="submit-btn" [disabled]="!canSubmit()">
+        Enviar solicitud
+      </ion-button>
+    </form>
+  </div>
+</ion-content>

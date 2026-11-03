@@ -12,14 +12,20 @@
 
     <!-- Formulario de Acceso -->
     <div class="form-section">
-      <form>
+      <form (ngSubmit)="onLogin()">
         
         <!-- Campo Correo -->
         <div class="input-group">
           <label>Correo electrónico</label>
           <ion-item lines="none" class="custom-input-item">
             <ion-icon name="mail-outline" slot="start"></ion-icon>
-            <ion-input type="email" placeholder="usuario@correo.com" required></ion-input>
+            <ion-input 
+              [(ngModel)]="correo" 
+              name="correo" 
+              type="email" 
+              placeholder="usuario@correo.com" 
+              required>
+            </ion-input>
           </ion-item>
         </div>
 
@@ -28,7 +34,13 @@
           <label>Contraseña</label>
           <ion-item lines="none" class="custom-input-item">
             <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
-            <ion-input type="password" placeholder="••••••••" required></ion-input>
+            <ion-input 
+              [(ngModel)]="password" 
+              name="password" 
+              type="password" 
+              placeholder="••••••••" 
+              required>
+            </ion-input>
           </ion-item>
         </div>
 

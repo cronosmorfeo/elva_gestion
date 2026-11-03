@@ -25,10 +25,22 @@ export class VacationRequestPage {
   readonly end = signal('');
   readonly comment = signal('');
 
-  readonly tooLong = computed(() => (rangeLength(this.start(), this.end()) ?? 0) > MAX_REQUEST_DAYS);
-  readonly days = computed(() =>
-    this.tooLong() ? [] : listVacationDays(this.start(), this.end(), holidaysBetween(this.start(), this.end())),
-  );
+  // Helper to get the actual last vacation day (the day before the return date)
+  private readonly lastVacationDay = computed(() => {
+    const returnDateStr = this.end();
+    if (!returnDateStr) return '';
+    const date = new Date(returnDateStr + 'T00:00:00');
+    if (isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() - 1);
+    return date.toISOString().split('T')[0];
+  });
+
+  readonly tooLong = computed(() => (rangeLength(this.start(), this.lastVacationDay()) ?? 0) > MAX_REQUEST_DAYS);
+  readonly days = computed(() => {
+    const lastDay = this.lastVacationDay();
+    if (!this.start() || !lastDay || this.tooLong()) return [];
+    return listVacationDays(this.start(), lastDay, holidaysBetween(this.start(), lastDay));
+  });
   readonly deducted = computed(() => countDeductedDays(this.days()));
   readonly remaining = computed(() => this.availableDays - this.deducted());
   readonly dayRows = computed(() => this.days().map((day) => toRow(day)));
@@ -38,7 +50,8 @@ export class VacationRequestPage {
 
   readonly error = computed(() => {
     if (!this.start() || !this.end()) return '';
-    if (this.end() < this.start()) return 'El último día no puede ser antes del primer día.';
+    if (this.end() < this.start()) return 'La fecha de reincorporación no puede ser antes del primer día.';
+    if (this.end() === this.start()) return 'La fecha de reincorporación debe ser posterior al primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';
     if (this.deducted() === 0) return 'Las fechas elegidas no incluyen días laborales.';
     if (this.remaining() < 0) return `Solo tiene ${this.availableDays} días disponibles.`;

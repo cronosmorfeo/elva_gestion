@@ -1,5 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
+
+import { RequestsStore } from '../services/requests-store';
 
 import { holidaysBetween } from './holidays';
 import type { VacationDay } from './vacation-days';
@@ -19,6 +22,8 @@ const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', '
 })
 export class VacationRequestPage {
   private readonly toast = inject(ToastController);
+  private readonly store = inject(RequestsStore);
+  private readonly router = inject(Router);
 
   readonly availableDays = EXAMPLE_AVAILABLE_DAYS;
   readonly start = signal('');
@@ -74,11 +79,22 @@ export class VacationRequestPage {
 
   async submit(): Promise<void> {
     if (!this.canSubmit()) return;
-    // TODO: save the request in Firestore once the login is connected.
+    const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
+    const days = this.deductedText();
+    this.store.addVacation(worker, {
+      start: this.start(),
+      returnDate: this.end(),
+      balance: this.availableDays,
+      comment: this.comment(),
+    });
+    this.start.set('');
+    this.end.set('');
+    this.comment.set('');
     const toast = await this.toast.create({
-      message: `Solicitud de ${this.deductedText()} lista. Todavía no se guarda: falta conectar el inicio de sesión.`,
-      duration: 4000,
+      message: `Solicitud de ${days} enviada. Puede verla en Mis solicitudes.`,
+      duration: 5000,
       position: 'bottom',
+      buttons: [{ text: 'Ver', handler: () => void this.router.navigateByUrl('/tabs/solicitudes') }],
     });
     await toast.present();
   }

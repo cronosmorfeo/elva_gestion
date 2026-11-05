@@ -1,0 +1,525 @@
+// Light theme for the worker pages (vacations, overtime, weekly report). Scoped to .elva-worker.
+// ELVA palette: white base, company teal for titles, numbers and actions.
+$teal: #008f82;
+$teal-dark: #00756b;
+$teal-soft: #e3f3f1;
+$ink: #12302d;
+$muted: #5a6d6a;
+$line: #dfe7e6;
+$tile: #f5f8f8;
+$amber: #9a5b00;
+$amber-soft: #fff4e0;
+$red: #b42318;
+$red-soft: #fdecea;
+
+.elva-worker {
+  // Always light, even when the device uses dark mode.
+  --background: #ffffff;
+  --color: #{$ink};
+  --ion-text-color: #{$ink};
+  --ion-background-color: #ffffff;
+  --ion-color-step-150: #{$line};
+  --ion-color-step-300: #c5d1cf;
+  --ion-color-step-500: #{$muted};
+  --ion-color-step-550: #{$muted};
+  --ion-color-step-600: #{$muted};
+  color: $ink;
+  color-scheme: light;
+
+  .page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 2.25rem 1.25rem 3rem;
+  }
+
+  h1 {
+    margin: 0.35rem 0 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: $teal;
+  }
+
+  h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: $ink;
+  }
+
+  .intro {
+    margin: 0.5rem 0 1.75rem;
+    color: $muted;
+    line-height: 1.55;
+  }
+
+  .card {
+    padding: 1rem 1.1rem;
+    border: 1px solid $line;
+    border-radius: 14px;
+    background: $tile;
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+    ion-input,
+    ion-textarea {
+      --background: #ffffff;
+      --color: #{$ink};
+      --placeholder-color: #8a9b98;
+      --border-color: #c5d1cf;
+      --border-radius: 12px;
+      --highlight-color-focused: #{$teal};
+      --highlight-color-valid: #{$teal};
+    }
+
+    ion-input::part(native) {
+      color-scheme: light;
+    }
+  }
+
+  .dates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .error {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    border: 1px solid #f3b4ae;
+    border-radius: 12px;
+    background: $red-soft;
+    color: $red;
+  }
+
+  .submit-btn {
+    --background: #{$teal};
+    --background-hover: #{$teal-dark};
+    --background-activated: #{$teal-dark};
+    --color: #ffffff;
+    --border-radius: 12px;
+    --box-shadow: none;
+    height: 50px;
+    margin: 0.25rem 0 0;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .note,
+  .hint {
+    margin: 0.75rem 0 0;
+    font-size: 0.8rem;
+    color: $muted;
+  }
+
+  // Totals and day list (vacations and overtime)
+  .balance {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+    border-color: #bfe3df;
+    background: $teal-soft;
+
+    strong {
+      font-size: 1.7rem;
+      color: $teal-dark;
+    }
+
+    small {
+      margin-left: auto;
+      color: $muted;
+    }
+  }
+
+  .totals {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6rem 1.5rem;
+    margin-bottom: 1rem;
+
+    &.two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    span {
+      display: block;
+      font-size: 0.85rem;
+      color: $muted;
+    }
+
+    strong {
+      font-size: 1.5rem;
+      color: $teal-dark;
+    }
+  }
+
+  .day-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 320px;
+    overflow-y: auto;
+
+    li {
+      display: grid;
+      grid-template-columns: 3rem 4.5rem 1fr;
+      padding: 0.55rem 0.75rem;
+      margin-bottom: 0.35rem;
+      border: 1px solid $line;
+      border-left: 4px solid $teal;
+      border-radius: 10px;
+      background: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    .weekday {
+      font-weight: 700;
+      color: $teal-dark;
+    }
+
+    .status {
+      text-align: right;
+      color: $muted;
+    }
+
+    .weekend {
+      border-left-color: #c5d1cf;
+      opacity: 0.7;
+
+      .weekday {
+        color: $muted;
+      }
+    }
+
+    .restDay,
+    .mandatoryHoliday {
+      border-left-color: #e0a030;
+      background: $amber-soft;
+
+      .weekday,
+      .status {
+        color: $amber;
+      }
+    }
+
+    .over {
+      border-left-color: $red;
+      background: $red-soft;
+
+      .weekday,
+      .status {
+        color: $red;
+      }
+    }
+  }
+
+  // Weekly report
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: $muted;
+
+    select {
+      padding: 0.8rem 0.75rem;
+      border: 1px solid #c5d1cf;
+      border-radius: 12px;
+      background: #ffffff;
+      color: $ink;
+      font: inherit;
+      font-size: 1rem;
+
+      &:focus {
+        outline: 2px solid $teal;
+        outline-offset: 1px;
+      }
+    }
+  }
+
+  .files {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+
+    .hint {
+      margin: 0;
+    }
+  }
+
+  .file-btn {
+    padding: 0.6rem 1rem;
+    border: 1px dashed $teal;
+    border-radius: 12px;
+    color: $teal;
+    font-weight: 700;
+    cursor: pointer;
+
+    &:hover {
+      background: $teal-soft;
+    }
+  }
+
+  .files input:focus-visible ~ .file-btn,
+  .file-btn:focus-within {
+    outline: 2px solid $teal;
+  }
+
+  .file-list,
+  .sent ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    align-self: stretch;
+  }
+
+  .file-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+    border: 1px solid $line;
+    border-radius: 10px;
+    background: $tile;
+    font-size: 0.9rem;
+
+    .kind {
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: $teal-soft;
+      color: $teal-dark;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .name {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .size {
+      color: $muted;
+    }
+
+    .remove {
+      border: 0;
+      background: none;
+      color: $muted;
+      font-size: 1rem;
+      cursor: pointer;
+
+      &:hover {
+        color: $red;
+      }
+    }
+  }
+
+  .sent {
+    margin-top: 2.5rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid $line;
+
+    li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+
+  .sent-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .chip {
+    padding: 2px 10px;
+    border-radius: 99px;
+    background: $amber-soft;
+    color: $amber;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+
+    &.seen {
+      background: $teal-soft;
+      color: $teal-dark;
+    }
+  }
+
+  .attachment {
+    font-size: 0.85rem;
+    color: $muted;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  // My requests and notices
+  .filter {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 1.25rem;
+    border: 1px solid $line;
+    border-radius: 12px;
+    background: $tile;
+
+    button {
+      padding: 0.55rem 1rem;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: $muted;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+
+      &.active {
+        background: #ffffff;
+        color: $teal-dark;
+        box-shadow: 0 1px 3px rgba(18, 48, 45, 0.12);
+      }
+
+      &:focus-visible {
+        outline: 2px solid $teal;
+      }
+    }
+
+    .count {
+      margin-left: 0.3rem;
+      padding: 0 0.45rem;
+      border-radius: 99px;
+      background: $teal-soft;
+      color: $teal-dark;
+      font-size: 0.75rem;
+    }
+  }
+
+  .request-list,
+  .notice-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .request {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    background: #ffffff;
+  }
+
+  .request-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .status {
+    flex-shrink: 0;
+    padding: 2px 10px;
+    border-radius: 99px;
+    background: $amber-soft;
+    color: $amber;
+    font-size: 0.78rem;
+    font-weight: 700;
+
+    &.aprobada {
+      background: $teal-soft;
+      color: $teal-dark;
+    }
+
+    &.rechazada {
+      background: $red-soft;
+      color: $red;
+    }
+  }
+
+  .detail {
+    font-weight: 600;
+    color: $teal-dark;
+  }
+
+  .request-note,
+  .notice p {
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .meta {
+    font-size: 0.8rem;
+    color: $muted;
+  }
+
+  .empty {
+    color: $muted;
+
+    a {
+      margin-left: 0.25rem;
+      color: $teal;
+      font-weight: 700;
+    }
+  }
+
+  .notice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    background: #ffffff;
+
+    h2 {
+      margin: 0;
+    }
+
+    &.important {
+      border-color: #f0c96a;
+      border-left: 4px solid #e0a030;
+      background: #fffbf2;
+    }
+  }
+
+  .tag {
+    padding: 2px 10px;
+    border-radius: 99px;
+    background: $amber-soft;
+    color: $amber;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 480px) {
+    .dates,
+    .totals.two {
+      grid-template-columns: 1fr;
+    }
+  }
+}

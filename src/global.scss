@@ -1,3 +1,7 @@
+@use './theme/admin-dashboard';
+@use './theme/admin-form';
+@use './theme/worker-pages';
+
 /*
  * App Global CSS
  * ----------------------------------------------------------------------------
@@ -35,3 +39,14 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import '@ionic/angular/css/palettes/dark.system.css';
+
+
+/* Light popover for the select menus on white pages (Tab 3), even in dark mode. */
+.elva-light-popover {
+  --background: #ffffff;
+  --ion-text-color: #12302d;
+  --ion-background-color: #ffffff;
+  --ion-item-background: #ffffff;
+  --ion-color-primary: #008f82;
+  color-scheme: light;
+}

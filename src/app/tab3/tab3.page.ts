@@ -1,7 +1,8 @@
 
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 
 import {
   IonHeader,
@@ -14,8 +15,22 @@ import {
   IonSelect,
   IonSelectOption,
   IonButton,
+  IonButtons,
   IonSpinner
 } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import {
+  arrowBackOutline,
+  calendarOutline,
+  cardOutline,
+  peopleCircleOutline,
+  peopleOutline,
+  personAddOutline,
+  personOutline,
+  shieldCheckmarkOutline,
+  timeOutline,
+  walletOutline,
+} from 'ionicons/icons';
 
 import { getApp, initializeApp, deleteApp } from 'firebase/app';
 
@@ -32,10 +47,24 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
+import {
+  currencySymbol,
+  formatCedula,
+  formatThousands,
+  groupIban,
+  hoursText,
+  isValidCedula,
+  isValidCrIban,
+  normalizeIban,
+  parseAmount,
+  scheduleText,
+  shiftMinutes,
+} from './employee-form';
+
 interface Colaborador {
   nombre: string;
   pais: string;
-  salario: number;
+  salario: number | null;
   moneda: string;
   fechaIngreso: string;
   jornada: string;
@@ -62,6 +91,7 @@ interface Colaborador {
     IonSelect,
     IonSelectOption,
     IonButton,
+    IonButtons,
     IonSpinner
   ]
 })
@@ -81,10 +111,102 @@ export class Tab3Page {
 
   guardando = false;
 
+  // Display-only state for the formatted fields.
+  salarioTexto = '';
+  horaInicio = '';
+  horaFin = '';
+  // TODO: payment data is not saved yet; the backend decides where (a private document).
+  pago = { cedula: '', iban: '', monedaCuenta: '' };
+
+  // Shown in the success window after the employee is created.
+  creado: { nombre: string; correo: string } | null = null;
+
+  private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
+
   private app = getApp();
   private db = getFirestore(this.app);
 
-  constructor() {}
+  constructor() {
+    addIcons({
+      arrowBackOutline,
+      calendarOutline,
+      cardOutline,
+      peopleCircleOutline,
+      peopleOutline,
+      personAddOutline,
+      personOutline,
+      shieldCheckmarkOutline,
+      timeOutline,
+      walletOutline,
+    });
+  }
+
+  cambiarSalario(event: Event): void {
+    const input = event.target as HTMLIonInputElement;
+    this.colaborador.salario = parseAmount(String(input.value ?? ''));
+    this.salarioTexto = formatThousands(this.colaborador.salario);
+    input.value = this.salarioTexto;
+  }
+
+  simboloMoneda(): string {
+    return currencySymbol(this.colaborador.moneda);
+  }
+
+  cambiarHora(cual: 'inicio' | 'fin', event: Event): void {
+    const value = String((event.target as HTMLIonInputElement).value ?? '');
+    if (cual === 'inicio') this.horaInicio = value;
+    else this.horaFin = value;
+    this.colaborador.horarioLaborado = scheduleText(this.horaInicio, this.horaFin);
+  }
+
+  horasTurno(): string {
+    return hoursText(shiftMinutes(this.horaInicio, this.horaFin));
+  }
+
+  cambiarCedula(event: Event): void {
+    const input = event.target as HTMLIonInputElement;
+    this.pago.cedula = formatCedula(String(input.value ?? ''));
+    input.value = this.pago.cedula;
+  }
+
+  cedulaValida(): boolean {
+    return isValidCedula(this.pago.cedula);
+  }
+
+  cambiarIban(event: Event): void {
+    const input = event.target as HTMLIonInputElement;
+    this.pago.iban = groupIban(String(input.value ?? ''));
+    input.value = this.pago.iban;
+  }
+
+  ibanCompleto(): boolean {
+    return normalizeIban(this.pago.iban).length >= 22;
+  }
+
+  ibanValido(): boolean {
+    return isValidCrIban(this.pago.iban);
+  }
+
+  irAlPanel(): void {
+    this.creado = null;
+    void this.router.navigateByUrl('/tabs/dashboard');
+  }
+
+  crearOtro(): void {
+    this.creado = null;
+    setTimeout(() => document.querySelector<HTMLInputElement>('ion-input[name="nombre"] input')?.focus());
+  }
+
+  // Opens the calendar when the date box is clicked, not only its small icon.
+  abrirCalendario(event: Event): void {
+    const input = (event.currentTarget as HTMLElement).querySelector('input');
+    try {
+      input?.showPicker();
+    } catch {
+      input?.focus();
+    }
+  }
 
   async crearColaborador() {
 
@@ -170,7 +292,10 @@ export class Tab3Page {
         }
       );
 
-      alert('El colaborador fue creado correctamente.');
+      this.creado = {
+        nombre: this.colaborador.nombre.trim(),
+        correo: this.colaborador.correo.trim().toLowerCase(),
+      };
 
       this.limpiarFormulario();
 
@@ -201,6 +326,8 @@ export class Tab3Page {
       }
 
       this.guardando = false;
+      // The app runs without zone.js, so the screen must be told that saving finished.
+      this.cdr.markForCheck();
     }
   }
 
@@ -216,5 +343,9 @@ export class Tab3Page {
       correo: '',
       password: ''
     };
+    this.salarioTexto = '';
+    this.horaInicio = '';
+    this.horaFin = '';
+    this.pago = { cedula: '', iban: '', monedaCuenta: '' };
   }
 }

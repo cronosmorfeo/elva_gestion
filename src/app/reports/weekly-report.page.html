@@ -1,0 +1,80 @@
+<ion-content [fullscreen]="true" class="report-content elva-worker">
+  <div class="page">
+    <h1>Mi reporte semanal</h1>
+    <p class="intro">
+      Cuente qué hizo esta semana. Es opcional. Puede escribir, adjuntar archivos o las dos cosas. Solo usted y la
+      administración pueden verlo.
+    </p>
+
+    <form class="form" (submit)="$event.preventDefault(); submit()">
+      <label class="field">
+        <span>Semana</span>
+        <select [value]="week()" (change)="setWeek($event)">
+          @for (w of weeks; track w.value) {
+          <option [value]="w.value">{{ w.label }}</option>
+          }
+        </select>
+      </label>
+
+      <ion-textarea
+        label="¿Qué hizo esta semana?"
+        labelPlacement="stacked"
+        fill="outline"
+        placeholder="Ej.: terminé el informe de ventas y atendí 20 tiquetes."
+        [autoGrow]="true"
+        [maxlength]="2000"
+        [value]="text()"
+        (ionInput)="setText($event.detail.value)"
+      ></ion-textarea>
+
+      <div class="files">
+        <label class="file-btn" for="report-files">Adjuntar archivos</label>
+        <input id="report-files" class="sr-only" type="file" multiple (change)="addFiles($event)" />
+        <span class="hint"
+          >PDF, capturas, documentos o cualquier archivo. Hasta {{ maxFiles }}, de 10 MB cada uno.</span
+        >
+
+        @if (fileRows().length) {
+        <ul class="file-list">
+          @for (f of fileRows(); track f.index) {
+          <li>
+            <span class="kind">{{ f.kind }}</span>
+            <span class="name">{{ f.name }}</span>
+            <span class="size">{{ f.size }}</span>
+            <button type="button" class="remove" [attr.aria-label]="'Quitar ' + f.name" (click)="removeFile(f.index)">
+              ✕
+            </button>
+          </li>
+          }
+        </ul>
+        }
+      </div>
+
+      @if (visibleProblem()) {
+      <p class="error" role="alert">{{ visibleProblem() }}</p>
+      }
+
+      <ion-button expand="block" type="submit" class="submit-btn" [disabled]="!!problem()"> Enviar reporte </ion-button>
+    </form>
+
+    <section class="sent" aria-labelledby="sent-title">
+      <h2 id="sent-title">Mis reportes enviados</h2>
+      <ul>
+        @for (r of sentRows(); track r.id) {
+        <li class="card">
+          <div class="sent-top">
+            <strong>{{ r.week }}</strong>
+            <span class="chip" [class.seen]="r.seen">{{ r.seen ? 'Visto' : 'No visto todavía' }}</span>
+          </div>
+          @if (r.text) {
+          <p>{{ r.text }}</p>
+          } @for (a of r.attachments; track a) {
+          <span class="attachment">{{ a }}</span>
+          }
+        </li>
+        }
+      </ul>
+      <p class="note">"Visto" quiere decir que la administración ya lo leyó. Si tienen dudas, le escriben por Slack.</p>
+    </section>
+  </div>
+</ion-content>

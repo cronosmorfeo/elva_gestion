@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 
+import { RequestsStore } from '../services/requests-store';
 import { holidaysBetween } from '../vacation-request/holidays';
 
 import type { OvertimeDay, PayPart } from './overtime-hours';
@@ -22,6 +24,8 @@ const RATE_NAMES = new Map([
 })
 export class OvertimeRequestPage {
   private readonly toast = inject(ToastController);
+  private readonly store = inject(RequestsStore);
+  private readonly router = inject(Router);
 
   readonly minStart = `${localToday()}T00:00`;
   readonly start = signal('');
@@ -62,11 +66,17 @@ export class OvertimeRequestPage {
 
   async submit(): Promise<void> {
     if (!this.canSubmit()) return;
-    // TODO: save the request in Firestore once the login is connected.
+    const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
+    const total = this.totalText();
+    this.store.addOvertime(worker, { start: this.start(), end: this.end(), task: this.task() });
+    this.start.set('');
+    this.end.set('');
+    this.task.set('');
     const toast = await this.toast.create({
-      message: `Solicitud de ${this.totalText()} lista. Todavía no se guarda: falta conectar el inicio de sesión.`,
-      duration: 4000,
+      message: `Solicitud de ${total} enviada. Puede verla en Mis solicitudes.`,
+      duration: 5000,
       position: 'bottom',
+      buttons: [{ text: 'Ver', handler: () => void this.router.navigateByUrl('/tabs/solicitudes') }],
     });
     await toast.present();
   }

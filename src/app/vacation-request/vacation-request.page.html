@@ -1,12 +1,12 @@
-<ion-content [fullscreen]="true" class="vacation-content">
-  <div class="vacation-container">
+<ion-content [fullscreen]="true" class="vacation-content elva-worker">
+  <div class="page">
     <h1>Solicitar vacaciones</h1>
     <p class="intro">
       Elija el primer y el último día. Solo se descuentan los días laborales: los fines de semana y los feriados
       obligatorios no cuentan.
     </p>
 
-    <div class="balance">
+    <div class="balance card">
       <span>Días disponibles</span>
       <strong>{{ availableDays }}</strong>
       <small>Dato de ejemplo</small>
@@ -46,8 +46,8 @@
       @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
       } @if (days().length > 0) {
-      <section class="summary" aria-label="Resumen de la solicitud">
-        <div class="totals">
+      <section class="summary card" aria-label="Resumen de la solicitud">
+        <div class="totals two">
           <div>
             <span>Se descuentan</span>
             <strong>{{ deductedText() }}</strong>

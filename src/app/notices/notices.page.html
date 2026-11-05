@@ -1,0 +1,21 @@
+<ion-content [fullscreen]="true" class="elva-worker">
+  <div class="page">
+    <h1>Avisos</h1>
+    <p class="intro">Información de la administración para todo el equipo.</p>
+
+    <ul class="notice-list">
+      @for (n of notices(); track n.id) {
+      <li class="card notice" [class.important]="n.important">
+        @if (n.important) {
+        <span class="tag">Importante</span>
+        }
+        <h2>{{ n.title }}</h2>
+        <p>{{ n.message }}</p>
+        <span class="meta">{{ n.author }} · {{ n.date }}{{ n.edited ? ' · editado' : '' }}</span>
+      </li>
+      } @empty {
+      <li class="card empty">No hay avisos por ahora.</li>
+      }
+    </ul>
+  </div>
+</ion-content>

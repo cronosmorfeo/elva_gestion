@@ -1,7 +1,29 @@
+@if (signedIn() && !ownHeader()) {
 <ion-header>
-
+  <ion-toolbar class="navbar">
+    <nav class="navbar-content" aria-label="Menú principal">
+      <span class="brand">
+        <img src="assets/icon/logo.png" alt="" />
+        <span class="brand-name">ELVA Gestión</span>
+      </span>
+      <div class="links">
+        <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
+        <a routerLink="/tabs/horas-extra" routerLinkActive="active" ariaCurrentWhenActive="page">Horas extra</a>
+        <a routerLink="/tabs/reporte" routerLinkActive="active" ariaCurrentWhenActive="page">Mi reporte</a>
+        <a routerLink="/tabs/solicitudes" routerLinkActive="active" ariaCurrentWhenActive="page">Mis solicitudes</a>
+        <a routerLink="/tabs/avisos" routerLinkActive="active" ariaCurrentWhenActive="page">
+          Avisos @if (unseenNotices() > 0) {
+          <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
+          }
+        </a>
+        @if (isAdmin()) {
+        <a routerLink="/tabs/dashboard">Panel de administración</a>
+        }
+      </div>
+      <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
+    </nav>
+  </ion-toolbar>
 </ion-header>
+}
 
-<ion-tabs>
-
-</ion-tabs>
+<ion-tabs></ion-tabs>

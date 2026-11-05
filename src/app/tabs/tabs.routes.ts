@@ -1,5 +1,8 @@
 import type { Routes } from '@angular/router';
 
+import { adminGuard } from '../auth/admin.guard';
+import { authGuard } from '../auth/auth.guard';
+
 import { TabsPage } from './tabs.page';
 
 export const routes: Routes = [
@@ -21,13 +24,33 @@ export const routes: Routes = [
       },
       {
         path: 'vacaciones',
-        // TODO: add canActivate: [authGuard] (../auth/auth.guard) once the login is connected.
+        canActivate: [authGuard],
         loadComponent: () => import('../vacation-request/vacation-request.page').then((m) => m.VacationRequestPage),
       },
       {
         path: 'horas-extra',
-        // TODO: add canActivate: [authGuard] (../auth/auth.guard) once the login is connected.
+        canActivate: [authGuard],
         loadComponent: () => import('../overtime-request/overtime-request.page').then((m) => m.OvertimeRequestPage),
+      },
+      {
+        path: 'solicitudes',
+        canActivate: [authGuard],
+        loadComponent: () => import('../my-requests/my-requests.page').then((m) => m.MyRequestsPage),
+      },
+      {
+        path: 'avisos',
+        canActivate: [authGuard],
+        loadComponent: () => import('../notices/notices.page').then((m) => m.NoticesPage),
+      },
+      {
+        path: 'reporte',
+        canActivate: [authGuard],
+        loadComponent: () => import('../reports/weekly-report.page').then((m) => m.WeeklyReportPage),
+      },
+      {
+        path: 'dashboard',
+        canActivate: [adminGuard],
+        loadComponent: () => import('../admin-dashboard/admin-dashboard.page').then((m) => m.AdminDashboardPage),
       },
       {
         path: '',

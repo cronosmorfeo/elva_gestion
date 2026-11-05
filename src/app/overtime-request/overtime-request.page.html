@@ -1,5 +1,5 @@
-<ion-content [fullscreen]="true" class="overtime-content">
-  <div class="overtime-container">
+<ion-content [fullscreen]="true" class="overtime-content elva-worker">
+  <div class="page">
     <h1>Solicitar horas extra</h1>
     <p class="intro">
       Elija cuándo empieza y cuándo termina, y explique qué va a hacer. RH revisa la solicitud antes de la aprobación
@@ -41,7 +41,7 @@
       @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
       } @if (days().length > 0) {
-      <section class="summary" aria-label="Resumen de la solicitud">
+      <section class="summary card" aria-label="Resumen de la solicitud">
         <div class="totals">
           <span>Total</span>
           <strong>{{ totalText() }}</strong>

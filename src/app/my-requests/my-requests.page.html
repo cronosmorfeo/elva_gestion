@@ -1,0 +1,54 @@
+<ion-content [fullscreen]="true" class="elva-worker">
+  <div class="page">
+    <h1>Mis solicitudes</h1>
+    <p class="intro">Acá ve las solicitudes que envió y si la administración las aprobó o las rechazó.</p>
+
+    <div class="filter" role="group" aria-label="Tipo de solicitud">
+      <button
+        type="button"
+        [class.active]="kind() === 'vacaciones'"
+        [attr.aria-pressed]="kind() === 'vacaciones'"
+        (click)="setKind('vacaciones')"
+      >
+        Vacaciones <span class="count">{{ vacations().length }}</span>
+      </button>
+      <button
+        type="button"
+        [class.active]="kind() === 'horas'"
+        [attr.aria-pressed]="kind() === 'horas'"
+        (click)="setKind('horas')"
+      >
+        Horas extra <span class="count">{{ overtime().length }}</span>
+      </button>
+    </div>
+
+    @if (loading()) {
+    <p class="note">Cargando…</p>
+    } @else {
+    <ul class="request-list">
+      @for (r of rows(); track r.id) {
+      <li class="card request">
+        <div class="request-top">
+          <strong>{{ r.title }}</strong>
+          <span class="status" [class]="r.status">{{ r.statusText }}</span>
+        </div>
+        <span class="detail">{{ r.detail }}</span>
+        @if (r.note) {
+        <p class="request-note">{{ r.note }}</p>
+        }
+        <span class="meta">{{ r.sent }}{{ r.sample ? ' · Ejemplo' : '' }}</span>
+      </li>
+      } @empty {
+      <li class="card empty">
+        @if (kind() === 'vacaciones') { Todavía no ha pedido vacaciones.
+        <a routerLink="/tabs/vacaciones">Pedir vacaciones</a> } @else { Todavía no ha pedido horas extra.
+        <a routerLink="/tabs/horas-extra">Pedir horas extra</a>
+        }
+      </li>
+      }
+    </ul>
+    }
+
+    <p class="note">Por ahora las solicitudes se borran al recargar la página: falta guardarlas en la base de datos.</p>
+  </div>
+</ion-content>

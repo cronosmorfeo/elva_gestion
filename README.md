@@ -6,10 +6,14 @@ Internal Human Resources app for ELVA IA. Employees submit requests (vacation an
 
 | Section | Route | What it does |
 | --- | --- | --- |
-| Navbar | Top of every page | Main menu. "Vacaciones" and "Horas extra" work; the other options are marked as coming soon. Not hidden before sign-in yet. |
-| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. The balance is example data and requests are not saved yet. |
-| Overtime request | `/tabs/horas-extra` | Pick a start and end (it can cross midnight), describe the work and see the hours per day with their pay rate. Requests are not saved yet. |
-| Login (Tab 1) | `/tabs/login` | Sign-in screen with the ELVA logo. Not yet connected to Firebase Authentication. |
+| Navbar | Top of the worker pages | Shown only after sign-in. Links to Vacaciones, Horas extra, Mi reporte, Mis solicitudes and Avisos (with the number of new notices), "Panel de administración" for admin/HR, and "Cerrar sesión". Hidden on login, the dashboard and Tab 3, which have their own header. |
+| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. Signed-in users only. The balance is example data. A sent request shows up in Mis solicitudes and in the dashboard. |
+| Overtime request | `/tabs/horas-extra` | Pick a start and end (it can cross midnight), describe the work and see the hours per day with their pay rate. Signed-in users only. A sent request shows up in Mis solicitudes and in the dashboard. |
+| Admin dashboard | `/tabs/dashboard` | Admin and HR only. Fixed side menu, today's date, request summary, vacation and overtime approvals, pending payments, real employee list and upcoming holidays. Edit an employee's data and read each employee's weekly reports (mark them as seen). Approve or reject requests and manage notices. Requests and notices are shared with the worker pages in memory (`RequestsStore`) and are lost on reload; payments and reports are sample data; only employee edits are saved to Firestore. |
+| My requests | `/tabs/solicitudes` | Signed-in users only. The worker's own vacation and overtime requests (filter by type) with their status: pending, approved or rejected. |
+| Notices | `/tabs/avisos` | Signed-in users only. Notices published by admin/HR, important ones on top. Admins create, edit and delete them in the dashboard. |
+| Weekly report | `/tabs/reporte` | Signed-in workers only. Optional: pick the week, write what they did and/or attach any files. Reports are not saved yet. |
+| Login (Tab 1) | `/tabs/login` | Sign-in with Firebase Authentication. Workers go to Vacaciones; admin/HR go to the dashboard. |
 | Push test (Tab 2) | `/tabs/tab2` | **Temporary** page to test push notifications with an anonymous user. To be replaced once the login is connected. |
 | Users (Tab 3) | `/tabs/tab3` | Admin panel to create employees in Firebase Authentication and Firestore. |
 
@@ -101,6 +105,10 @@ src/
     ├── auth/                      # Sign-in guard (not connected yet)
     ├── vacation-request/          # Vacation request page and Costa Rica holidays
     ├── overtime-request/          # Overtime request page
+    ├── admin-dashboard/           # Admin dashboard (sample requests and payments)
+    ├── reports/                   # Weekly report page and helpers
+    ├── my-requests/               # My requests page (worker)
+    ├── notices/                   # Notices page and helpers
     ├── login/                     # Sign-in screen (Tab 1)
     ├── tab2/                      # Push test page, temporary (Tab 2)
     ├── tab3/                      # Users panel (Tab 3)
@@ -148,6 +156,9 @@ The service worker holds no credentials: it receives them in its URL when regist
 - **Credentials:** `environment.ts` and `environment.prod.ts` are not committed (see [Getting started](#getting-started)).
 - **Firestore rules:** the repository's `firestore.rules` allows all reads and writes (`allow read, write: if true`). It is for development only. **Before loading real data**, publish rules that restrict access by user and role, since `colaboradores` stores salaries.
 - **Sign-in:** for now the navbar and the request pages are visible without signing in. `authGuard` in `src/app/auth` is ready and will be connected once the login works.
+- **Admin dashboard:** `adminGuard` only lets in users whose `tipo_colaborador` is `admin` or `rh`. It hides the page in the app, but the Firestore rules must also restrict `colaboradores` and the requests to those roles.
+- **Requests and notices:** a worker may read only their own requests; only admin/HR may decide requests and write notices; every signed-in user may read notices. `RequestsStore` keeps them in memory until they are saved in Firestore with rules that enforce this.
+- **Weekly reports:** only the worker who sent a report and admin/HR may read it, never coworkers. When reports are saved, the Firestore rules (`reportes`) and the Storage rules for the attached files must enforce that.
 - **Anonymous sign-in:** disable it in Firebase once the push test page is removed.
 - **Notifications:** notification text must not include sensitive data, because it shows on the lock screen.
 

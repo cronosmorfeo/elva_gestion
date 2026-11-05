@@ -1,6 +1,12 @@
 
-<ion-header class="admin-header">
+<ion-header class="admin-header elva-admin">
   <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button class="back-button" (click)="irAlPanel()">
+        <ion-icon slot="start" name="arrow-back-outline" aria-hidden="true"></ion-icon>
+        Volver al panel
+      </ion-button>
+    </ion-buttons>
     <ion-title>
       <div class="header-title">
         <ion-icon name="people-circle-outline"></ion-icon>
@@ -10,7 +16,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true" class="admin-content">
+<ion-content [fullscreen]="true" class="admin-content elva-admin">
 
   <div class="admin-container">
 
@@ -102,6 +108,7 @@
             <ion-select
               name="pais"
               interface="popover"
+              [interfaceOptions]="{ cssClass: 'elva-light-popover' }"
               placeholder="Seleccionar país"
               fill="outline"
               [(ngModel)]="colaborador.pais"
@@ -128,8 +135,11 @@
               name="fechaIngreso"
               type="date"
               fill="outline"
+              class="date-input"
               [(ngModel)]="colaborador.fechaIngreso"
+              (click)="abrirCalendario($event)"
               required>
+              <ion-icon slot="end" name="calendar-outline" aria-hidden="true"></ion-icon>
             </ion-input>
           </div>
 
@@ -148,14 +158,16 @@
             <ion-label>Salario *</ion-label>
 
             <ion-input
-              name="salario"
-              type="number"
-              placeholder="0.00"
+              type="text"
+              inputmode="numeric"
+              placeholder="Ej. 450.000"
               fill="outline"
-              [(ngModel)]="colaborador.salario"
-              min="0"
-              required>
+              aria-label="Salario mensual"
+              [value]="salarioTexto"
+              (ionInput)="cambiarSalario($event)">
+              <span slot="start" class="currency">{{ simboloMoneda() }}</span>
             </ion-input>
+            <input type="hidden" name="salario" [ngModel]="colaborador.salario" required />
           </div>
 
           <!-- Moneda -->
@@ -165,6 +177,7 @@
             <ion-select
               name="moneda"
               interface="popover"
+              [interfaceOptions]="{ cssClass: 'elva-light-popover' }"
               placeholder="Seleccionar moneda"
               fill="outline"
               [(ngModel)]="colaborador.moneda"
@@ -214,6 +227,7 @@
             <ion-select
               name="jornada"
               interface="popover"
+              [interfaceOptions]="{ cssClass: 'elva-light-popover' }"
               placeholder="Seleccionar jornada"
               fill="outline"
               [(ngModel)]="colaborador.jornada"
@@ -246,14 +260,107 @@
           <div class="form-field">
             <ion-label>Horario laborado *</ion-label>
 
+            <div class="time-range">
+              <ion-input
+                type="time"
+                fill="outline"
+                class="date-input"
+                aria-label="Hora de entrada"
+                [value]="horaInicio"
+                (ionInput)="cambiarHora('inicio', $event)"
+                (click)="abrirCalendario($event)">
+                <ion-icon slot="end" name="time-outline" aria-hidden="true"></ion-icon>
+              </ion-input>
+              <span class="to">a</span>
+              <ion-input
+                type="time"
+                fill="outline"
+                class="date-input"
+                aria-label="Hora de salida"
+                [value]="horaFin"
+                (ionInput)="cambiarHora('fin', $event)"
+                (click)="abrirCalendario($event)">
+                <ion-icon slot="end" name="time-outline" aria-hidden="true"></ion-icon>
+              </ion-input>
+            </div>
+            <input type="hidden" name="horarioLaborado" [ngModel]="colaborador.horarioLaborado" required />
+            @if (colaborador.horarioLaborado) {
+              <p class="field-hint">{{ colaborador.horarioLaborado }} · {{ horasTurno() }}</p>
+            } @else {
+              <p class="field-hint">Elegí la hora de entrada y la de salida.</p>
+            }
+          </div>
+
+        </div>
+
+        <!-- DATOS DE PAGO -->
+        <!-- TODO: save these fields in a separate private document that only payroll can read. -->
+        <div class="section-title">
+          <ion-icon name="card-outline"></ion-icon>
+          Datos de pago
+          <span class="pending-chip">Todavía no se guarda</span>
+        </div>
+
+        <div class="form-grid">
+
+          <!-- Cédula -->
+          <div class="form-field">
+            <ion-label>Cédula</ion-label>
+
             <ion-input
-              name="horarioLaborado"
               type="text"
-              placeholder="Ej. 8:00 AM - 5:00 PM"
+              inputmode="numeric"
+              placeholder="Ej. 1-1234-5678"
               fill="outline"
-              [(ngModel)]="colaborador.horarioLaborado"
-              required>
+              aria-label="Cédula"
+              [value]="pago.cedula"
+              (ionInput)="cambiarCedula($event)">
             </ion-input>
+            @if (pago.cedula && !cedulaValida()) {
+              <p class="field-hint error">Revisá la cédula: son 9 números (o 11 a 12 si es DIMEX).</p>
+            }
+          </div>
+
+          <!-- Moneda de la cuenta -->
+          <div class="form-field">
+            <ion-label>Moneda de la cuenta</ion-label>
+
+            <ion-select
+              interface="popover"
+              [interfaceOptions]="{ cssClass: 'elva-light-popover' }"
+              placeholder="Seleccionar moneda"
+              fill="outline"
+              aria-label="Moneda de la cuenta"
+              [(ngModel)]="pago.monedaCuenta"
+              [ngModelOptions]="{ standalone: true }">
+              <ion-select-option value="CRC">Colones (CRC)</ion-select-option>
+              <ion-select-option value="USD">Dólares (USD)</ion-select-option>
+            </ion-select>
+          </div>
+
+          <!-- IBAN -->
+          <div class="form-field full-width">
+            <ion-label>Cuenta IBAN</ion-label>
+
+            <ion-input
+              type="text"
+              placeholder="CR00 0000 0000 0000 0000 00"
+              fill="outline"
+              autocomplete="off"
+              aria-label="Cuenta IBAN"
+              class="iban-input"
+              [value]="pago.iban"
+              (ionInput)="cambiarIban($event)">
+            </ion-input>
+            @if (pago.iban && ibanCompleto()) {
+              @if (ibanValido()) {
+                <p class="field-hint ok">✓ Cuenta IBAN válida</p>
+              } @else {
+                <p class="field-hint error">Esta cuenta IBAN no es válida. Revisá los números.</p>
+              }
+            } @else {
+              <p class="field-hint">CR seguido de 20 números. Se usa para pagar el salario por transferencia.</p>
+            }
           </div>
 
         </div>
@@ -317,16 +424,11 @@
             class="create-button"
             [disabled]="guardando || colaboradorForm.invalid">
 
-            <ion-icon
-              name="person-add-outline"
-              slot="start"
-              *ngIf="!guardando">
-            </ion-icon>
-
-            <ion-spinner
-              name="crescent"
-              *ngIf="guardando">
-            </ion-spinner>
+            @if (guardando) {
+              <ion-spinner name="crescent"></ion-spinner>
+            } @else {
+              <ion-icon name="person-add-outline" slot="start"></ion-icon>
+            }
 
             {{ guardando ? 'Creando usuario...' : 'Crear usuario' }}
 
@@ -343,5 +445,23 @@
     </div>
 
   </div>
+
+  @if (creado) {
+    <div class="success-backdrop">
+      <div class="success-modal" role="dialog" aria-modal="true" aria-labelledby="creado-titulo">
+        <div class="success-icon" aria-hidden="true">✓</div>
+        <h2 id="creado-titulo">Usuario creado correctamente</h2>
+        <p>
+          <strong>{{ creado.nombre }}</strong> ya puede iniciar sesión con
+          <strong>{{ creado.correo }}</strong>.
+        </p>
+        <p class="success-tip">Entregale la contraseña en privado.</p>
+        <div class="success-actions">
+          <ion-button fill="clear" color="medium" (click)="crearOtro()">Crear otro usuario</ion-button>
+          <ion-button id="creado-aceptar" class="create-button" (click)="irAlPanel()">Aceptar</ion-button>
+        </div>
+      </div>
+    </div>
+  }
 
 </ion-content>

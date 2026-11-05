@@ -1,0 +1,831 @@
+<ion-content [fullscreen]="true" class="admin-content elva-dashboard">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="assets/icon/logo.png" alt="" />
+        <div>
+          <strong>ELVA Gestión</strong>
+          <span>Administración</span>
+        </div>
+      </div>
+
+      <nav class="menu" aria-label="Menú de administración">
+        @for (section of sections; track section.id) {
+        <button
+          type="button"
+          class="menu-item"
+          [class.active]="activeSection() === section.id"
+          [attr.aria-current]="activeSection() === section.id ? 'true' : null"
+          (click)="goTo(section.id)"
+        >
+          <span>{{ section.label }}</span>
+          @if (section.id === 'vacaciones' && vacationCounts().pendiente > 0) {
+          <span class="badge">{{ vacationCounts().pendiente }}</span>
+          } @if (section.id === 'horas-extra' && overtimeCounts().pendiente > 0) {
+          <span class="badge">{{ overtimeCounts().pendiente }}</span>
+          } @if (section.id === 'pagos' && paymentSummary().pendingCount > 0) {
+          <span class="badge">{{ paymentSummary().pendingCount }}</span>
+          }
+        </button>
+        }
+        <button type="button" class="menu-item" (click)="goTo('empleados')">
+          <span>Reportes</span>
+          @if (unseenReports() > 0) {
+          <span class="badge" [attr.aria-label]="unseenReports() + ' reportes sin ver'">{{ unseenReports() }}</span>
+          }
+        </button>
+      </nav>
+
+      <div class="profile">
+        <div class="person">
+          <span class="avatar" aria-hidden="true">{{ profileInitials() }}</span>
+          <div>
+            <strong>{{ profileName() || 'Administrador' }}</strong>
+            <span>{{ profileRole() || 'Administración' }}</span>
+          </div>
+        </div>
+        <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header id="resumen" class="page-head">
+        <div>
+          <span class="date">{{ todayText() }}</span>
+          <h1>Panel de administración</h1>
+        </div>
+        <a class="btn primary" routerLink="/tabs/tab3">+ Crear empleado</a>
+      </header>
+
+      <section class="kpis" aria-label="Resumen de solicitudes">
+        <div class="kpi">
+          <span class="label">Vacaciones pendientes</span>
+          <span class="value warn">{{ summary().pendingVacations }}</span>
+          <span class="sub">{{ summary().waitingRh }}</span>
+        </div>
+        <div class="kpi">
+          <span class="label">Vacaciones aprobadas</span>
+          <span class="value">{{ summary().approvedVacations }}</span>
+          <span class="sub">{{ summary().approvedVacationDays }} en total</span>
+        </div>
+        <div class="kpi">
+          <span class="label">Horas extra pendientes</span>
+          <span class="value warn">{{ summary().pendingOvertime }}</span>
+          <span class="sub">{{ summary().pendingOvertimeHours }} en total</span>
+        </div>
+        <div class="kpi">
+          <span class="label">Horas extra aprobadas</span>
+          <span class="value">{{ summary().approvedOvertime }}</span>
+          <span class="sub">{{ summary().approvedOvertimeHours }} en total</span>
+        </div>
+      </section>
+
+      <div class="columns">
+        <div class="col-main">
+          <section id="vacaciones" class="card" aria-labelledby="t-vac">
+            <div class="card-head">
+              <h2 id="t-vac">Aprobar vacaciones</h2>
+              <span class="sample">Datos de ejemplo</span>
+              <div class="tabs" role="group" aria-label="Filtrar vacaciones">
+                @for (tab of statusTabs; track tab.id) {
+                <button
+                  type="button"
+                  [class.on]="vacationTab() === tab.id"
+                  [attr.aria-pressed]="vacationTab() === tab.id"
+                  (click)="vacationTab.set(tab.id)"
+                >
+                  {{ tab.label }} · {{ vacationCounts()[tab.id] }}
+                </button>
+                }
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th>Fechas</th>
+                    <th>Días</th>
+                    <th>Revisión RH</th>
+                    <th class="right">Decisión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of vacationRows(); track row.id) {
+                  <tr>
+                    <td>
+                      <strong>{{ row.employee }}</strong>
+                      <span class="muted">Saldo: {{ row.balance }}</span>
+                    </td>
+                    <td>{{ row.start }} <span class="muted inline">→ vuelve</span> {{ row.returnDate }}</td>
+                    <td class="num">{{ row.days }}</td>
+                    <td>
+                      @if (row.rhReviewed) {
+                      <span class="chip ok">Revisada</span>
+                      } @else {
+                      <span class="chip warn">Falta RH</span>
+                      }
+                    </td>
+                    <td class="right">
+                      @if (row.canDecide) {
+                      <div class="actions">
+                        <button type="button" class="btn danger" (click)="decideVacation(row.id, 'rechazada')">
+                          Rechazar
+                        </button>
+                        <button type="button" class="btn primary" (click)="decideVacation(row.id, 'aprobada')">
+                          Aprobar
+                        </button>
+                      </div>
+                      } @else if (row.waiting) {
+                      <span class="muted inline">Espera a RH</span>
+                      } @else if (row.status === 'aprobada') {
+                      <span class="chip ok">Aprobada</span>
+                      } @else {
+                      <span class="chip rejected">Rechazada</span>
+                      }
+                    </td>
+                  </tr>
+                  } @empty {
+                  <tr>
+                    <td colspan="5" class="empty">No hay solicitudes aquí.</td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="horas-extra" class="card" aria-labelledby="t-he">
+            <div class="card-head">
+              <h2 id="t-he">Horas extra por aprobar</h2>
+              <span class="sample">Datos de ejemplo</span>
+              <div class="tabs" role="group" aria-label="Filtrar horas extra">
+                @for (tab of statusTabs; track tab.id) {
+                <button
+                  type="button"
+                  [class.on]="overtimeTab() === tab.id"
+                  [attr.aria-pressed]="overtimeTab() === tab.id"
+                  (click)="overtimeTab.set(tab.id)"
+                >
+                  {{ tab.label }} · {{ overtimeCounts()[tab.id] }}
+                </button>
+                }
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th>Cuándo</th>
+                    <th>Horas y pago</th>
+                    <th>Qué va a hacer</th>
+                    <th class="right">Decisión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of overtimeRows(); track row.id) {
+                  <tr>
+                    <td><strong>{{ row.employee }}</strong></td>
+                    <td>
+                      {{ row.date }}
+                      <span class="muted">{{ row.hours }}</span>
+                    </td>
+                    <td>
+                      <strong class="num">{{ row.total }}</strong>
+                      <span class="muted">{{ row.pay }}</span>
+                    </td>
+                    <td class="task">{{ row.task }}</td>
+                    <td class="right">
+                      @if (row.canDecide) {
+                      <div class="actions">
+                        <button type="button" class="btn danger" (click)="decideOvertime(row.id, 'rechazada')">
+                          Rechazar
+                        </button>
+                        <button type="button" class="btn primary" (click)="decideOvertime(row.id, 'aprobada')">
+                          Aprobar
+                        </button>
+                      </div>
+                      } @else if (row.waiting) {
+                      <span class="muted inline">Espera a RH</span>
+                      } @else if (row.status === 'aprobada') {
+                      <span class="chip ok">Aprobada</span>
+                      } @else {
+                      <span class="chip rejected">Rechazada</span>
+                      }
+                    </td>
+                  </tr>
+                  } @empty {
+                  <tr>
+                    <td colspan="5" class="empty">No hay solicitudes aquí.</td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="empleados" class="card" aria-labelledby="t-emp">
+            <div class="card-head">
+              <h2 id="t-emp">Gestión de empleados</h2>
+              <div class="emp-tools">
+                <label class="sr-only" for="buscar-empleado">Buscar empleado</label>
+                <input
+                  id="buscar-empleado"
+                  type="search"
+                  placeholder="Buscar por nombre o correo"
+                  [value]="search()"
+                  (input)="setSearch($event)"
+                />
+                <a class="btn primary" routerLink="/tabs/tab3">Crear empleado</a>
+              </div>
+            </div>
+            @if (employeesState() === 'loading') {
+            <p class="empty">Cargando empleados…</p>
+            } @else if (employeesState() === 'error') {
+            <p class="empty">No se pudo cargar la lista de empleados. Revisá la conexión y recargá la página.</p>
+            } @else {
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th>Tipo</th>
+                    <th>Jornada</th>
+                    <th>Ingreso</th>
+                    <th>Estado</th>
+                    <th>Reportes</th>
+                    <th class="right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (e of filteredEmployees(); track e.id) {
+                  <tr>
+                    <td>
+                      <strong>
+                        {{ e.name }} @if (e.sample) {
+                        <span class="chip sample-chip">Ejemplo</span>
+                        }
+                      </strong>
+                      <span class="muted">{{ e.email }}</span>
+                    </td>
+                    <td>{{ e.role }}</td>
+                    <td>{{ e.schedule }}</td>
+                    <td>{{ e.startDate }}</td>
+                    <td>
+                      @if (e.active) {
+                      <span class="chip ok">Activo</span>
+                      } @else {
+                      <span class="chip off">Inactivo</span>
+                      }
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        class="report-link"
+                        [id]="'reports-' + e.id"
+                        [class.has-new]="unseenFor(e.id) > 0"
+                        (click)="openReports(e.id)"
+                      >
+                        {{ unseenFor(e.id) > 0 ? unseenFor(e.id) + ' sin ver' : 'Ver' }}
+                      </button>
+                    </td>
+                    <td class="right">
+                      <button type="button" class="btn ghost" [id]="'edit-' + e.id" (click)="openEdit(e.id)">
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                  } @empty {
+                  <tr>
+                    <td colspan="7" class="empty">
+                      {{ search() ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay empleados. Creá el primero.' }}
+                    </td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <span class="muted inline">{{ employeeTotals() }}</span>
+            }
+          </section>
+        </div>
+
+        <div class="col-side">
+          <section id="pagos" class="card dark" aria-labelledby="t-pagos">
+            <div class="pay-head">
+              <h2 id="t-pagos">Pagos pendientes</h2>
+              <span class="sample">Datos de ejemplo</span>
+            </div>
+            <div class="pay-box">
+              <span class="dim strong">Salarios pendientes</span>
+              <span class="amount">{{ paymentSummary().salaries }}</span>
+              <span class="dim">{{ paymentSummary().salaryDetail }}</span>
+            </div>
+            <div class="pay-box">
+              <span class="dim strong">Horas extra aprobadas por pagar</span>
+              <span class="amount">{{ paymentSummary().overtime }}</span>
+              <span class="dim">{{ paymentSummary().overtimeDetail }}</span>
+            </div>
+            <div class="extras">
+              <span class="dim strong">Por pagar · {{ paymentSummary().pendingCount }}</span>
+              @for (p of pendingPayments(); track p.id) {
+              <div class="pay-row">
+                <div>
+                  <span>{{ p.concept }}</span>
+                  <span class="dim">{{ p.employee }} · {{ p.amount }}</span>
+                </div>
+                <button type="button" class="btn accent small" [id]="'pay-' + p.id" (click)="openPayment(p.id)">
+                  Pagar
+                </button>
+              </div>
+              } @empty {
+              <span class="dim">No hay pagos pendientes.</span>
+              }
+              <span class="dim">{{ paymentSummary().paidText }}</span>
+            </div>
+          </section>
+
+          <section id="avisos" class="card" aria-labelledby="t-avisos">
+            <div class="card-head">
+              <h2 id="t-avisos" class="small-title">Avisos para el equipo</h2>
+              <button id="notice-new" type="button" class="btn primary small" (click)="openNotice()">
+                Nuevo aviso
+              </button>
+            </div>
+            @for (n of noticeRows(); track n.id) {
+            <div class="notice-row">
+              <div>
+                <strong>{{ n.title }}</strong>
+                @if (n.important) {
+                <span class="chip warn">Importante</span>
+                }
+                <span class="muted">{{ n.date }} · {{ n.author }}{{ n.edited ? ' · editado' : '' }}</span>
+              </div>
+              <div class="notice-actions">
+                @if (confirmDeleteId() === n.id) {
+                <span class="muted inline">¿Borrar este aviso?</span>
+                <button type="button" class="btn ghost small" (click)="confirmDeleteId.set(null)">No</button>
+                <button type="button" class="btn danger small" (click)="deleteNotice(n.id)">Sí, borrar</button>
+                } @else {
+                <button type="button" class="btn ghost small" [id]="'notice-' + n.id" (click)="openNotice(n.id)">
+                  Editar
+                </button>
+                <button type="button" class="btn ghost small" (click)="confirmDeleteId.set(n.id)">Borrar</button>
+                }
+              </div>
+            </div>
+            } @empty {
+            <p class="empty left">No hay avisos publicados.</p>
+            }
+          </section>
+
+          <section class="card" aria-labelledby="t-semana">
+            <h2 id="t-semana" class="small-title">De vacaciones esta semana</h2>
+            @for (v of onVacation(); track v.id) {
+            <div class="line">
+              <strong>{{ v.employee }}</strong>
+              <span class="muted inline">{{ v.until }}</span>
+            </div>
+            } @empty {
+            <p class="empty left">Nadie tiene vacaciones aprobadas esta semana.</p>
+            }
+          </section>
+
+          <section class="card" aria-labelledby="t-fer">
+            <h2 id="t-fer" class="small-title">Próximos feriados</h2>
+            @for (h of holidays(); track h.date) {
+            <div class="line">
+              <span><strong>{{ h.label }}</strong> · {{ h.name }}</span>
+              <span class="muted inline" [class.mandatory]="h.mandatory">
+                {{ h.mandatory ? 'obligatorio' : 'no obligatorio' }}
+              </span>
+            </div>
+            }
+          </section>
+
+          <section class="card" aria-labelledby="t-act">
+            <h2 id="t-act" class="small-title">Actividad reciente</h2>
+            @for (a of activity(); track $index) {
+            <div class="line stack">
+              <span>{{ a.text }}</span>
+              <span class="muted inline">{{ a.time }}</span>
+            </div>
+            } @empty {
+            <p class="empty left">Aquí aparecen las aprobaciones y rechazos que hagás.</p>
+            }
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  @if (paymentDetail(); as d) {
+  <div class="modal-backdrop">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pay-title"
+      tabindex="-1"
+      (keydown.escape)="closePayment()"
+    >
+      <div class="modal-head">
+        <div>
+          <span class="sample">Datos de ejemplo</span>
+          <h2 id="pay-title">Pagar {{ d.title }}</h2>
+        </div>
+        <button id="pay-close" type="button" class="icon-btn" aria-label="Cerrar" (click)="closePayment()">✕</button>
+      </div>
+
+      <div class="modal-amount">
+        <span class="label">Monto a pagar</span>
+        <strong>{{ d.amount }}</strong>
+        <span class="muted">{{ d.period }} · colones (CRC)</span>
+        <button type="button" class="btn ghost small" (click)="copy(d.amountDigits, 'Monto')">Copiar monto</button>
+      </div>
+
+      <dl class="details">
+        <div>
+          <dt>Nombre completo</dt>
+          <dd>{{ d.name }}</dd>
+        </div>
+        <div>
+          <dt>Cédula</dt>
+          <dd>{{ d.cedula }}</dd>
+        </div>
+        <div>
+          <dt>Correo</dt>
+          <dd>{{ d.email }}</dd>
+        </div>
+        <div>
+          <dt>Banco</dt>
+          <dd>{{ d.bank }}</dd>
+        </div>
+        <div class="wide">
+          <dt>Cuenta IBAN</dt>
+          <dd class="iban">{{ d.ibanShown }}</dd>
+          @if (d.hasIban) {
+          <div class="iban-actions">
+            <button type="button" class="btn ghost small" (click)="toggleIban()">
+              {{ ibanVisible() ? 'Ocultar' : 'Mostrar' }}
+            </button>
+            <button type="button" class="btn ghost small" (click)="copy(d.ibanDigits, 'IBAN')">Copiar IBAN</button>
+          </div>
+          }
+        </div>
+      </dl>
+
+      <p class="modal-note">
+        El pago se hace en la app del banco. Esta página solo muestra los datos y registra que se pagó.
+      </p>
+
+      <div class="receipt">
+        <label for="pay-receipt">Número de comprobante de la transferencia</label>
+        <input
+          id="pay-receipt"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="Ej.: 2026110412345678"
+          [value]="receipt()"
+          (input)="setReceipt($event)"
+        />
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" (click)="closePayment()">Cancelar</button>
+        <button type="button" class="btn primary" [disabled]="!receipt().trim()" (click)="confirmPayment()">
+          Marcar como pagado
+        </button>
+      </div>
+    </div>
+  </div>
+  } @if (reportHistory(); as h) {
+  <div class="modal-backdrop">
+    <div
+      class="modal reports-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reports-title"
+      tabindex="-1"
+      (keydown.escape)="closeReports()"
+    >
+      <div class="modal-head">
+        <div>
+          @if (h.employee.sample) {
+          <span class="sample">Datos de ejemplo</span>
+          }
+          <h2 id="reports-title">Reportes de {{ h.employee.name }}</h2>
+          <span class="muted">{{ h.items.length }} enviados · {{ h.unseen }} sin ver</span>
+        </div>
+        <button id="reports-close" type="button" class="icon-btn" aria-label="Cerrar" (click)="closeReports()">
+          ✕
+        </button>
+      </div>
+
+      <p class="modal-note">
+        Solo esta persona y la administración ven estos reportes. Si tenés una duda, escribile por Slack.
+      </p>
+
+      <ul class="report-list">
+        @for (r of h.items; track r.id) {
+        <li class="report-item" [class.new]="!r.seen">
+          <div class="report-top">
+            <div>
+              <strong>{{ r.week }}</strong>
+              <span class="muted">Enviado el {{ r.sent }}</span>
+            </div>
+            @if (r.seen) {
+            <span class="chip ok">Visto</span>
+            } @else {
+            <span class="chip new-chip">Nuevo</span>
+            }
+          </div>
+          @if (r.text) {
+          <p class="report-text">{{ r.text }}</p>
+          } @if (r.attachments.length) {
+          <ul class="attachments" aria-label="Archivos adjuntos">
+            @for (a of r.attachments; track a.name) {
+            <li>
+              <span class="file-kind">{{ a.kind }}</span>
+              <span class="file-name">{{ a.name }}</span>
+              <span class="muted">{{ a.size }}</span>
+            </li>
+            }
+          </ul>
+          } @if (!r.seen) {
+          <button type="button" class="btn ghost small" (click)="markSeen(r.id)">Marcar como visto</button>
+          }
+        </li>
+        } @empty {
+        <li class="empty">Todavía no ha enviado reportes. Son opcionales.</li>
+        }
+      </ul>
+
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" (click)="closeReports()">Cerrar</button>
+        <button type="button" class="btn primary" [disabled]="h.unseen === 0" (click)="markAllSeen()">
+          Marcar todos como vistos
+        </button>
+      </div>
+    </div>
+  </div>
+  } @if (noticeForm(); as nf) {
+  <div class="modal-backdrop">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notice-modal-title"
+      tabindex="-1"
+      (keydown.escape)="closeNotice()"
+    >
+      <div class="modal-head">
+        <div>
+          <h2 id="notice-modal-title">{{ nf.id ? 'Editar aviso' : 'Nuevo aviso' }}</h2>
+          <span class="muted">Lo ven todos los trabajadores en la página Avisos.</span>
+        </div>
+        <button type="button" class="icon-btn" aria-label="Cerrar" (click)="closeNotice()">✕</button>
+      </div>
+
+      <div class="edit-field">
+        <label for="notice-title">Título</label>
+        <input
+          id="notice-title"
+          type="text"
+          placeholder="Ej.: El 1 de enero se trabaja con pago doble"
+          [attr.maxlength]="maxNoticeTitle"
+          [value]="nf.title"
+          (input)="setNoticeText('title', $event)"
+        />
+      </div>
+      <div class="edit-field">
+        <label for="notice-message">Mensaje</label>
+        <textarea
+          id="notice-message"
+          rows="5"
+          [attr.maxlength]="maxNoticeMessage"
+          [value]="nf.message"
+          (input)="setNoticeText('message', $event)"
+        ></textarea>
+        <span class="muted">{{ nf.message.length }} / {{ maxNoticeMessage }}</span>
+      </div>
+      <label class="switch" for="notice-important">
+        <input id="notice-important" type="checkbox" [checked]="nf.important" (change)="setNoticeImportant($event)" />
+        <span>Marcar como importante (sale resaltado arriba)</span>
+      </label>
+
+      @if (noticeError() && (nf.title || nf.message)) {
+      <p class="error-text">{{ noticeError() }}</p>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" (click)="closeNotice()">Cancelar</button>
+        <button type="button" class="btn primary" [disabled]="!!noticeError()" (click)="saveNotice()">
+          {{ nf.id ? 'Guardar cambios' : 'Publicar aviso' }}
+        </button>
+      </div>
+    </div>
+  </div>
+  } @if (editing(); as f) {
+  <div class="modal-backdrop">
+    <div
+      class="modal edit-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-title"
+      tabindex="-1"
+      (keydown.escape)="closeEdit()"
+    >
+      <div class="modal-head">
+        <div>
+          @if (f.sample) {
+          <span class="sample">Empleado de ejemplo: no se guarda</span>
+          }
+          <h2 id="edit-title">Editar empleado</h2>
+          <span class="muted inline">{{ f.email }}</span>
+        </div>
+        <button id="edit-close" type="button" class="icon-btn" aria-label="Cerrar" (click)="closeEdit()">✕</button>
+      </div>
+
+      <h3 class="edit-section">Información personal</h3>
+      <div class="edit-grid">
+        <div class="edit-field wide">
+          <label for="edit-nombre">Nombre completo</label>
+          <input id="edit-nombre" type="text" [value]="f.nombre" (input)="setEditField('nombre', $event)" />
+        </div>
+        <div class="edit-field">
+          <label for="edit-pais">País</label>
+          <select id="edit-pais" [value]="f.pais" (change)="setEditField('pais', $event)">
+            <option value="" disabled>Seleccionar país</option>
+            @for (c of countryOptions; track c.value) {
+            <option [value]="c.value" [selected]="c.value === f.pais">{{ c.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="edit-field">
+          <label for="edit-fecha">Fecha de ingreso</label>
+          <input
+            id="edit-fecha"
+            type="date"
+            [value]="f.fechaIngreso"
+            (input)="setEditField('fechaIngreso', $event)"
+            (click)="openPicker($event)"
+          />
+        </div>
+      </div>
+
+      <h3 class="edit-section">Información salarial</h3>
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label for="edit-salario">Salario mensual</label>
+          <div class="money">
+            <span>{{ editState()?.symbol }}</span>
+            <input
+              id="edit-salario"
+              type="text"
+              inputmode="numeric"
+              placeholder="Ej. 450.000"
+              [value]="f.salarioTexto"
+              (input)="setEditSalary($event)"
+            />
+          </div>
+        </div>
+        <div class="edit-field">
+          <label for="edit-moneda">Moneda</label>
+          <select id="edit-moneda" [value]="f.moneda" (change)="setEditField('moneda', $event)">
+            <option value="" disabled>Seleccionar moneda</option>
+            @for (c of currencyOptions; track c.value) {
+            <option [value]="c.value" [selected]="c.value === f.moneda">{{ c.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <h3 class="edit-section">Jornada laboral</h3>
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label for="edit-jornada">Jornada</label>
+          <select id="edit-jornada" [value]="f.jornada" (change)="setEditField('jornada', $event)">
+            <option value="" disabled>Seleccionar jornada</option>
+            @for (j of scheduleOptions; track j.value) {
+            <option [value]="j.value" [selected]="j.value === f.jornada">{{ j.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="edit-field">
+          <span class="field-label" id="edit-horario-label">Horario laborado</span>
+          <div class="times" role="group" aria-labelledby="edit-horario-label">
+            <input
+              type="time"
+              aria-label="Hora de entrada"
+              [value]="f.horaInicio"
+              (input)="setEditField('horaInicio', $event)"
+              (click)="openPicker($event)"
+            />
+            <span>a</span>
+            <input
+              type="time"
+              aria-label="Hora de salida"
+              [value]="f.horaFin"
+              (input)="setEditField('horaFin', $event)"
+              (click)="openPicker($event)"
+            />
+          </div>
+          @if (editState()?.schedule) {
+          <span class="muted">{{ editState()?.schedule }} · {{ editState()?.hours }}</span>
+          }
+        </div>
+      </div>
+
+      <h3 class="edit-section">Acceso</h3>
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label for="edit-tipo">Tipo de cuenta</label>
+          <select id="edit-tipo" [value]="f.tipo" [disabled]="f.self" (change)="setEditField('tipo', $event)">
+            @for (r of roleOptions; track r.value) {
+            <option [value]="r.value" [selected]="r.value === f.tipo">{{ r.label }}</option>
+            }
+          </select>
+          @if (f.self) {
+          <span class="muted">No podés cambiar tu propio tipo de cuenta.</span>
+          }
+        </div>
+        <div class="edit-field">
+          <span class="field-label">Estado</span>
+          <label class="switch" for="edit-activo">
+            <input
+              id="edit-activo"
+              type="checkbox"
+              [checked]="f.activo"
+              [disabled]="f.self"
+              (change)="setEditActive($event)"
+            />
+            <span>{{ f.activo ? 'Activo: puede iniciar sesión' : 'Inactivo: no puede iniciar sesión' }}</span>
+          </label>
+          @if (f.self) {
+          <span class="muted">No podés desactivar tu propia cuenta.</span>
+          }
+        </div>
+      </div>
+
+      <h3 class="edit-section">Datos de pago <span class="sample">Todavía no se guarda</span></h3>
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label for="edit-cedula">Cédula</label>
+          <input
+            id="edit-cedula"
+            type="text"
+            inputmode="numeric"
+            placeholder="Ej. 1-1234-5678"
+            [value]="f.cedula"
+            (input)="setEditCedula($event)"
+          />
+          @if (editState()?.cedulaError) {
+          <span class="error-text">Revisá la cédula: son 9 números (o 11 a 12 si es DIMEX).</span>
+          }
+        </div>
+        <div class="edit-field">
+          <label for="edit-moneda-cuenta">Moneda de la cuenta</label>
+          <select id="edit-moneda-cuenta" [value]="f.monedaCuenta" (change)="setEditField('monedaCuenta', $event)">
+            <option value="">Seleccionar moneda</option>
+            <option value="CRC" [selected]="f.monedaCuenta === 'CRC'">Colones (CRC)</option>
+            <option value="USD" [selected]="f.monedaCuenta === 'USD'">Dólares (USD)</option>
+          </select>
+        </div>
+        <div class="edit-field wide">
+          <label for="edit-iban">Cuenta IBAN</label>
+          <input
+            id="edit-iban"
+            type="text"
+            class="mono"
+            autocomplete="off"
+            placeholder="CR00 0000 0000 0000 0000 00"
+            [value]="f.iban"
+            (input)="setEditIban($event)"
+          />
+          @if (f.iban && editState()?.ibanComplete) { @if (editState()?.ibanValid) {
+          <span class="ok-text">✓ Cuenta IBAN válida</span>
+          } @else {
+          <span class="error-text">Esta cuenta IBAN no es válida. Revisá los números.</span>
+          } }
+        </div>
+      </div>
+
+      @if (editState()?.missing) {
+      <p class="error-text">{{ editState()?.missing }}</p>
+      } @if (editError()) {
+      <p class="error-text" role="alert">{{ editError() }}</p>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" (click)="closeEdit()">Cancelar</button>
+        <button type="button" class="btn primary" [disabled]="!editState()?.canSave" (click)="saveEdit()">
+          {{ editSaving() ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</ion-content>

@@ -1,0 +1,703 @@
+{
+  "nombre": "Modelo de datos de ELVA Gestión",
+  "version": "1.0 (propuesta)",
+  "fecha": "2026-11-06",
+  "indice": {
+    "leerPrimero": "docs/modelo-de-datos.md",
+    "comoBuscar": "En VS Code: Ctrl+Shift+O lista todas las secciones; Ctrl+F busca una palabra (ej. \"reportes\"). En GitHub: tecla t o Ctrl+F.",
+    "porTema": {
+      "Empleados": ["colecciones.colaboradores", "colecciones.pago_privado", "pantallas.dashboard.empleados"],
+      "Vacaciones": [
+        "colecciones.solicitudes_vacaciones",
+        "pantallas.dashboard.aprobarVacaciones",
+        "pantallas.dashboard.vacacionesEstaSemana",
+        "pantallas.trabajador.vacaciones"
+      ],
+      "Horas extra": [
+        "colecciones.solicitudes_horas",
+        "pantallas.dashboard.horasExtra",
+        "pantallas.trabajador.horasExtra"
+      ],
+      "Mis solicitudes": ["pantallas.trabajador.misSolicitudes"],
+      "Pagos": ["colecciones.pagos", "pantallas.dashboard.pagos"],
+      "Reportes": ["colecciones.reportes", "pantallas.dashboard.reportes", "pantallas.trabajador.miReporte"],
+      "Avisos": ["colecciones.avisos", "pantallas.dashboard.avisos", "pantallas.trabajador.avisos"],
+      "Actividad": ["colecciones.actividad", "pantallas.dashboard.actividad"],
+      "Resumen y feriados": ["pantallas.dashboard.resumen", "pantallas.dashboard.feriados", "calculadosSinGuardar"],
+      "Notificaciones push": ["colecciones.tokens_push"],
+      "Permisos": ["reglasFirestore"]
+    }
+  },
+  "convenciones": {
+    "sinDuplicados": "Cada dato se guarda en un solo lugar. Las solicitudes, pagos, reportes y avisos guardan solo el uid del empleado; el nombre, correo y saldo se leen de colaboradores/{uid}. Lo que se puede calcular (días descontados, horas, pago por tasa, totales, feriados) no se guarda.",
+    "excepcionesJustificadas": {
+      "pagos.monto": "Se guarda porque es el monto que se debe en ese momento. Si el salario cambia después, el pago viejo no debe cambiar.",
+      "solicitudes.revisionRh / decision": "Historial de quién decidió y cuándo; no existe en otro lugar."
+    },
+    "fechaDia": "string \"YYYY-MM-DD\" (sin zona horaria)",
+    "fechaHora": "string \"YYYY-MM-DDTHH:mm\", hora de Costa Rica, elegida por la persona",
+    "marcaDeTiempo": "Timestamp de Firestore con serverTimestamp(). En los ejemplos se muestra como texto ISO.",
+    "nombresDeTiempo": "Todas las colecciones usan createdAt (creación o envío) y updatedAt (última edición), igual que lo que Tab 3 ya guarda en colaboradores.",
+    "montos": "number entero en la moneda indicada, sin decimales (425000 = ₡425.000)",
+    "estadoSolicitud": ["pendiente", "aprobada", "rechazada"],
+    "roles": {
+      "regular": "Trabajador",
+      "rh": "Recursos Humanos",
+      "admin": "Administrador"
+    },
+    "rolesDelPanel": ["admin", "rh"]
+  },
+  "colecciones": {
+    "colaboradores": {
+      "ruta": "colaboradores/{uid}",
+      "descripcion": "Un documento por empleado. El id es el uid de Firebase Auth. Es la única fuente del nombre, correo, rol, salario y saldo de vacaciones.",
+      "escribe": "admin/rh (Tab 3 al crear, \"Editar empleado\" al cambiar). Cada empleado puede escribir solo ultimaVisitaAvisos.",
+      "lee": "el mismo empleado y admin/rh",
+      "campos": {
+        "nombre": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Nombre completo"
+        },
+        "correo": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Correo de inicio de sesión (igual que en Auth; no se edita)"
+        },
+        "tipo_colaborador": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Rol",
+          "valores": ["regular", "rh", "admin"]
+        },
+        "pais": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Código de país",
+          "valores": ["CR", "PA", "GT", "SV", "HN", "NI", "MX", "US", "CO"]
+        },
+        "fechaIngreso": {
+          "tipo": "fechaDia",
+          "requerido": true,
+          "descripcion": "Día en que empezó en ELVA"
+        },
+        "salario": {
+          "tipo": "number",
+          "requerido": true,
+          "descripcion": "Salario mensual en la moneda de \"moneda\""
+        },
+        "moneda": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Moneda del salario",
+          "valores": ["CRC", "USD", "EUR", "MXN", "COP", "PAB"]
+        },
+        "jornada": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Tipo de jornada",
+          "valores": ["completa", "medio", "parcial", "nocturna", "flexible"]
+        },
+        "horarioLaborado": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Horario, ej. \"8:00 a. m. - 5:00 p. m.\""
+        },
+        "diasVacaciones": {
+          "tipo": "number",
+          "requerido": false,
+          "descripcion": "NUEVO. Saldo actual de vacaciones. Se resta al aprobar una solicitud (transacción)."
+        },
+        "activo": {
+          "tipo": "boolean",
+          "requerido": true,
+          "descripcion": "false = ya no puede iniciar sesión"
+        },
+        "ultimaVisitaAvisos": {
+          "tipo": "marcaDeTiempo",
+          "requerido": false,
+          "descripcion": "NUEVO. Para contar los avisos nuevos del navbar."
+        },
+        "createdAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Creación"
+        },
+        "updatedAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": false,
+          "descripcion": "Última edición"
+        }
+      },
+      "notas": "Hoy Tab 3 también guarda \"uid\" dentro del documento; sobra porque ya es el id del documento.",
+      "ejemplo": {
+        "nombre": "Ana Solís Rojas",
+        "correo": "ana.solis@elva.ai",
+        "tipo_colaborador": "regular",
+        "pais": "CR",
+        "fechaIngreso": "2024-03-01",
+        "salario": 850000,
+        "moneda": "CRC",
+        "jornada": "completa",
+        "horarioLaborado": "8:00 a. m. - 5:00 p. m.",
+        "diasVacaciones": 12,
+        "activo": true,
+        "ultimaVisitaAvisos": "2026-11-05T09:00:00Z",
+        "createdAt": "2026-11-05T15:00:00Z",
+        "updatedAt": "2026-11-06T09:30:00Z"
+      }
+    },
+    "pago_privado": {
+      "ruta": "colaboradores/{uid}/privado/pago",
+      "descripcion": "Datos bancarios. Aparte para que las reglas solo dejen leerlos a admin/rh.",
+      "escribe": "admin/rh",
+      "lee": "admin/rh",
+      "campos": {
+        "cedula": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Cédula física (9 dígitos) o DIMEX (11 o 12)"
+        },
+        "iban": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "CR + 20 dígitos, validado con mod 97"
+        },
+        "monedaCuenta": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Moneda de la cuenta",
+          "valores": ["CRC", "USD"]
+        },
+        "banco": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Nombre del banco"
+        },
+        "updatedAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Última edición"
+        }
+      },
+      "ejemplo": {
+        "cedula": "1-1234-0567",
+        "iban": "CR05015202001026284066",
+        "monedaCuenta": "CRC",
+        "banco": "Banco Nacional de Costa Rica",
+        "updatedAt": "2026-11-06T09:30:00Z"
+      }
+    },
+    "solicitudes_vacaciones": {
+      "ruta": "solicitudes_vacaciones/{id}",
+      "descripcion": "Una por pedido de vacaciones.",
+      "escribe": "el trabajador crea (estado pendiente); admin/rh cambian estado, revisionRh y decision",
+      "lee": "el dueño (uid) y admin/rh",
+      "campos": {
+        "uid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Quién la pidió → colaboradores/{uid}"
+        },
+        "inicio": {
+          "tipo": "fechaDia",
+          "requerido": true,
+          "descripcion": "Primer día de vacaciones"
+        },
+        "reincorporacion": {
+          "tipo": "fechaDia",
+          "requerido": true,
+          "descripcion": "Día en que vuelve a trabajar"
+        },
+        "comentario": {
+          "tipo": "string",
+          "requerido": false,
+          "descripcion": "Nota para RH"
+        },
+        "estado": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Estado",
+          "valores": ["pendiente", "aprobada", "rechazada"]
+        },
+        "revisionRh": {
+          "tipo": "map | null",
+          "requerido": true,
+          "descripcion": "{ por: uid, fecha: marcaDeTiempo }. null = falta revisión de RH"
+        },
+        "decision": {
+          "tipo": "map | null",
+          "requerido": true,
+          "descripcion": "{ por: uid, fecha: marcaDeTiempo }. null mientras está pendiente"
+        },
+        "createdAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Cuándo se envió"
+        }
+      },
+      "calculados": {
+        "diasDescontados": "vacationDays() con inicio, reincorporacion y los feriados"
+      },
+      "ejemplo": {
+        "uid": "Kx81fLq2",
+        "inicio": "2026-11-23",
+        "reincorporacion": "2026-11-30",
+        "comentario": "Viaje familiar",
+        "estado": "pendiente",
+        "revisionRh": {
+          "por": "uidRh",
+          "fecha": "2026-11-06T10:00:00Z"
+        },
+        "decision": null,
+        "createdAt": "2026-11-05T14:55:00Z"
+      }
+    },
+    "solicitudes_horas": {
+      "ruta": "solicitudes_horas/{id}",
+      "descripcion": "Una por pedido de horas extra (antes de trabajarlas).",
+      "escribe": "el trabajador crea; admin/rh cambian estado, revisionRh y decision",
+      "lee": "el dueño (uid) y admin/rh",
+      "campos": {
+        "uid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Quién la pidió → colaboradores/{uid}"
+        },
+        "inicio": {
+          "tipo": "fechaHora",
+          "requerido": true,
+          "descripcion": "Inicio"
+        },
+        "fin": {
+          "tipo": "fechaHora",
+          "requerido": true,
+          "descripcion": "Fin (puede ser otro día)"
+        },
+        "tarea": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Qué va a hacer"
+        },
+        "estado": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Estado",
+          "valores": ["pendiente", "aprobada", "rechazada"]
+        },
+        "revisionRh": {
+          "tipo": "map | null",
+          "requerido": true,
+          "descripcion": "{ por, fecha } o null"
+        },
+        "decision": {
+          "tipo": "map | null",
+          "requerido": true,
+          "descripcion": "{ por, fecha } o null"
+        },
+        "createdAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Cuándo se envió"
+        }
+      },
+      "calculados": {
+        "minutos": "overtimeMinutes()",
+        "pagoPorTasa": "overtimeDays() / overtimePay(): 1.5x, doble o triple según día y feriado"
+      },
+      "ejemplo": {
+        "uid": "Pm22aQ",
+        "inicio": "2026-11-08T08:00",
+        "fin": "2026-11-08T18:00",
+        "tarea": "Migración del servidor de correo",
+        "estado": "pendiente",
+        "revisionRh": {
+          "por": "uidRh",
+          "fecha": "2026-11-06T10:00:00Z"
+        },
+        "decision": null,
+        "createdAt": "2026-11-05T16:10:00Z"
+      }
+    },
+    "pagos": {
+      "ruta": "pagos/{id}",
+      "descripcion": "Lo que hay que pagar: salario de quincena u horas extra aprobadas.",
+      "escribe": "admin/rh o una Cloud Function (cada quincena y al aprobar horas extra)",
+      "lee": "admin/rh",
+      "campos": {
+        "uid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "A quién → colaboradores/{uid} y su privado/pago"
+        },
+        "tipo": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Qué se paga",
+          "valores": ["salario", "horas"]
+        },
+        "periodo": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Año-mes-quincena, ej. \"2026-11-Q1\" (Q1 = del 1 al 15, Q2 = del 16 al fin de mes)"
+        },
+        "monto": {
+          "tipo": "number",
+          "requerido": true,
+          "descripcion": "Monto a pagar (se guarda a propósito, ver excepcionesJustificadas)"
+        },
+        "moneda": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Moneda del monto",
+          "valores": ["CRC", "USD", "EUR", "MXN", "COP", "PAB"]
+        },
+        "solicitudHorasId": {
+          "tipo": "string | null",
+          "requerido": true,
+          "descripcion": "Si tipo = horas → solicitudes_horas/{id}"
+        },
+        "pago": {
+          "tipo": "map | null",
+          "requerido": true,
+          "descripcion": "{ comprobante, por: uid, fecha }. null = pendiente"
+        },
+        "createdAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Creación"
+        }
+      },
+      "ejemplo": {
+        "uid": "Kx81fLq2",
+        "tipo": "salario",
+        "periodo": "2026-11-Q1",
+        "monto": 425000,
+        "moneda": "CRC",
+        "solicitudHorasId": null,
+        "pago": null,
+        "createdAt": "2026-11-13T08:00:00Z"
+      }
+    },
+    "reportes": {
+      "ruta": "reportes/{id}",
+      "descripcion": "Reporte semanal opcional. Los archivos van a Storage en reportes/{uid}/{id}/{archivo} (Storage pide plan Blaze).",
+      "escribe": "el trabajador crea; admin/rh llenan visto",
+      "lee": "el dueño (uid) y admin/rh, nunca compañeros",
+      "campos": {
+        "uid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Quién lo envió → colaboradores/{uid}"
+        },
+        "semana": {
+          "tipo": "fechaDia",
+          "requerido": true,
+          "descripcion": "Lunes de la semana"
+        },
+        "texto": {
+          "tipo": "string",
+          "requerido": false,
+          "descripcion": "Qué hizo (puede ir vacío si hay archivos)"
+        },
+        "archivos": {
+          "tipo": "array<string>",
+          "requerido": false,
+          "descripcion": "Rutas en Storage. Nombre, tamaño y tipo salen de la metadata de Storage."
+        },
+        "visto": {
+          "tipo": "map | null",
+          "requerido": true,
+          "descripcion": "{ por: uid, fecha }. null = Nuevo"
+        },
+        "createdAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Cuándo se envió"
+        }
+      },
+      "ejemplo": {
+        "uid": "Kx81fLq2",
+        "semana": "2026-11-02",
+        "texto": "Terminé la conciliación de facturas de octubre.",
+        "archivos": ["reportes/Kx81fLq2/r1/conciliacion-octubre.xlsx"],
+        "visto": null,
+        "createdAt": "2026-11-06T16:40:00Z"
+      }
+    },
+    "avisos": {
+      "ruta": "avisos/{id}",
+      "descripcion": "Avisos de la administración para todos.",
+      "escribe": "admin/rh (crear, editar, borrar)",
+      "lee": "cualquiera con sesión",
+      "campos": {
+        "titulo": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Máximo 80 caracteres"
+        },
+        "mensaje": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Máximo 600 caracteres"
+        },
+        "importante": {
+          "tipo": "boolean",
+          "requerido": true,
+          "descripcion": "Sale arriba y resaltado"
+        },
+        "autorUid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Quién lo publicó → colaboradores/{uid}"
+        },
+        "createdAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Publicación"
+        },
+        "updatedAt": {
+          "tipo": "marcaDeTiempo | null",
+          "requerido": false,
+          "descripcion": "Última edición"
+        }
+      },
+      "ejemplo": {
+        "titulo": "El 1 de enero sí se trabaja, con pago doble",
+        "mensaje": "Se trabaja normal y se paga doble. Avisen a RH antes del 20 de diciembre si no pueden.",
+        "importante": true,
+        "autorUid": "uidAdmin",
+        "createdAt": "2026-11-05T09:15:00Z",
+        "updatedAt": null
+      }
+    },
+    "actividad": {
+      "ruta": "actividad/{id}",
+      "descripcion": "Bitácora de acciones de admins. Solo se crea; nunca se edita ni se borra.",
+      "escribe": "admin/rh (solo crear)",
+      "lee": "admin/rh",
+      "campos": {
+        "tipo": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Acción",
+          "valores": [
+            "aprobar",
+            "rechazar",
+            "pagar",
+            "ver_iban",
+            "editar_empleado",
+            "aviso_publicado",
+            "aviso_editado",
+            "aviso_borrado",
+            "reporte_visto"
+          ]
+        },
+        "porUid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Quién lo hizo → colaboradores/{uid}"
+        },
+        "sobre": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Ruta del documento afectado, ej. \"solicitudes_vacaciones/abc\""
+        },
+        "fecha": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Cuándo"
+        }
+      },
+      "calculados": {
+        "texto": "El frontend arma la frase (\"Paula Méndez vio la cuenta de Ana Solís\") con tipo, porUid y sobre"
+      },
+      "ejemplo": {
+        "tipo": "ver_iban",
+        "porUid": "uidAdmin",
+        "sobre": "colaboradores/Kx81fLq2",
+        "fecha": "2026-11-06T10:05:00Z"
+      }
+    },
+    "tokens_push": {
+      "ruta": "tokens_push/{uid}",
+      "descripcion": "Tokens de notificaciones de cada admin/rh. Los usa una Cloud Function (plan Blaze) para avisar de solicitudes y reportes nuevos.",
+      "escribe": "el mismo usuario",
+      "lee": "Cloud Function",
+      "campos": {
+        "tokens": {
+          "tipo": "array<string>",
+          "requerido": true,
+          "descripcion": "Tokens FCM de sus navegadores"
+        },
+        "updatedAt": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Última actualización"
+        }
+      },
+      "ejemplo": {
+        "tokens": ["token-fcm..."],
+        "updatedAt": "2026-11-06T09:00:00Z"
+      }
+    }
+  },
+  "calculadosSinGuardar": {
+    "feriados": "costaRicaHolidays() en vacation-request/holidays.ts, cualquier año",
+    "diasDescontados": "vacationDays(solicitud)",
+    "horasYPago": "overtimeMinutes() y overtimePay()",
+    "resumenDashboard": "conteos y sumas de solicitudes por estado",
+    "totalesPagos": "suma de pagos.monto con pago == null, por tipo",
+    "reportesSinVer": "conteo de reportes con visto == null por uid",
+    "avisosNuevos": "conteo de avisos con createdAt > colaboradores.ultimaVisitaAvisos",
+    "quincena": "quincenaLabel() a partir de periodo"
+  },
+  "pantallas": {
+    "dashboard.perfil": {
+      "fuente": ["colaboradores/{mi uid}"],
+      "muestra": {
+        "Nombre": "nombre",
+        "Rol": "tipo_colaborador"
+      }
+    },
+    "dashboard.resumen": {
+      "fuente": ["solicitudes_vacaciones", "solicitudes_horas"],
+      "muestra": "calculado: resumenDashboard"
+    },
+    "dashboard.aprobarVacaciones": {
+      "fuente": ["solicitudes_vacaciones", "colaboradores"],
+      "muestra": {
+        "Empleado": "colaboradores/{uid}.nombre",
+        "Saldo": "colaboradores/{uid}.diasVacaciones",
+        "Fechas": "inicio → reincorporacion",
+        "Días": "calculado: diasDescontados",
+        "Revisión RH": "revisionRh != null",
+        "Decisión / pestañas": "estado"
+      },
+      "acciones": {
+        "Aprobar": "estado = aprobada, decision = {por, fecha}, restar diasDescontados a colaboradores/{uid}.diasVacaciones (transacción), crear actividad",
+        "Rechazar": "estado = rechazada, decision = {por, fecha}, crear actividad"
+      }
+    },
+    "dashboard.vacacionesEstaSemana": {
+      "fuente": ["solicitudes_vacaciones (estado == aprobada)", "colaboradores"],
+      "muestra": {
+        "Nombre": "colaboradores/{uid}.nombre",
+        "Hasta": "reincorporacion"
+      }
+    },
+    "dashboard.horasExtra": {
+      "fuente": ["solicitudes_horas", "colaboradores"],
+      "muestra": {
+        "Empleado": "colaboradores/{uid}.nombre",
+        "Cuándo": "inicio, fin",
+        "Horas y pago": "calculado: horasYPago",
+        "Qué va a hacer": "tarea",
+        "Decisión": "estado"
+      },
+      "acciones": {
+        "Aprobar": "estado = aprobada, decision, crear pagos (tipo horas), crear actividad",
+        "Rechazar": "estado = rechazada, decision, crear actividad"
+      }
+    },
+    "dashboard.pagos": {
+      "fuente": ["pagos (pago == null)", "colaboradores", "colaboradores/{uid}/privado/pago"],
+      "muestra": {
+        "Concepto": "tipo + periodo",
+        "Empleado": "colaboradores/{uid}.nombre",
+        "Monto": "monto",
+        "Ventana Pagar": "cedula, banco, iban de privado/pago"
+      },
+      "acciones": {
+        "Mostrar IBAN": "crear actividad tipo ver_iban",
+        "Marcar como pagado": "pago = {comprobante, por, fecha}, crear actividad"
+      }
+    },
+    "dashboard.empleados": {
+      "fuente": ["colaboradores", "reportes"],
+      "muestra": {
+        "Empleado": "nombre, correo",
+        "Tipo": "tipo_colaborador",
+        "Jornada": "jornada",
+        "Ingreso": "fechaIngreso",
+        "Estado": "activo",
+        "Reportes": "calculado: reportesSinVer"
+      },
+      "acciones": {
+        "Editar": "actualizar colaboradores/{uid} y privado/pago, crear actividad"
+      }
+    },
+    "dashboard.reportes": {
+      "fuente": ["reportes (por uid)", "Storage"],
+      "muestra": {
+        "Semana": "semana",
+        "Enviado": "createdAt",
+        "Texto": "texto",
+        "Archivos": "archivos + metadata de Storage",
+        "Nuevo/Visto": "visto"
+      },
+      "acciones": {
+        "Marcar como visto": "visto = {por, fecha}, crear actividad"
+      }
+    },
+    "dashboard.avisos": {
+      "fuente": ["avisos", "colaboradores (autor)"],
+      "acciones": {
+        "Nuevo / Editar / Borrar": "escribir avisos, crear actividad"
+      }
+    },
+    "dashboard.actividad": {
+      "fuente": ["actividad (últimas 8)", "colaboradores"],
+      "muestra": "calculado: texto"
+    },
+    "dashboard.feriados": {
+      "fuente": [],
+      "muestra": "calculado: feriados"
+    },
+    "trabajador.vacaciones": {
+      "fuente": ["colaboradores/{mi uid}.diasVacaciones"],
+      "escribe": "solicitudes_vacaciones"
+    },
+    "trabajador.horasExtra": {
+      "fuente": [],
+      "escribe": "solicitudes_horas"
+    },
+    "trabajador.misSolicitudes": {
+      "fuente": ["solicitudes_vacaciones (uid == yo)", "solicitudes_horas (uid == yo)"]
+    },
+    "trabajador.avisos": {
+      "fuente": ["avisos", "colaboradores (autor)"],
+      "escribe": "colaboradores/{mi uid}.ultimaVisitaAvisos"
+    },
+    "trabajador.miReporte": {
+      "fuente": ["reportes (uid == yo)"],
+      "escribe": "reportes + Storage"
+    }
+  },
+  "reglasFirestore": {
+    "rolAdmin": "get(colaboradores/{request.auth.uid}).tipo_colaborador in ['admin','rh'] && activo == true",
+    "colaboradores": "lee dueño o admin; escribe admin; el dueño solo puede cambiar ultimaVisitaAvisos; nadie cambia su propio tipo_colaborador ni activo",
+    "privado/pago": "solo admin",
+    "solicitudes_*": "crea el dueño con uid == request.auth.uid, estado == pendiente, revisionRh == null, decision == null; lee dueño o admin; actualiza solo admin",
+    "reportes": "crea el dueño con visto == null; lee dueño o admin; actualiza visto solo admin",
+    "pagos": "solo admin",
+    "actividad": "crea y lee admin; nadie edita ni borra",
+    "avisos": "lee cualquiera con sesión; escribe admin",
+    "tokens_push": "cada usuario escribe el suyo"
+  },
+  "nombresFrontendAFirestore": {
+    "employee": "(se lee de colaboradores con uid)",
+    "ownerId": "uid",
+    "start/returnDate": "inicio/reincorporacion",
+    "start/end (horas)": "inicio/fin",
+    "task": "tarea",
+    "comment": "comentario",
+    "balance": "colaboradores.diasVacaciones",
+    "rhReviewed": "revisionRh != null",
+    "status": "estado",
+    "sentAt": "createdAt",
+    "Notice.title/message/important": "titulo/mensaje/importante",
+    "Notice.author": "autorUid",
+    "Notice.createdAt/updatedAt": "createdAt/updatedAt"
+  }
+}

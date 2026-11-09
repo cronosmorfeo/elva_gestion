@@ -1,15 +1,13 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
+import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- Añadido collection, addDoc, serverTimestamp
 
 import { RequestsStore } from '../services/requests-store';
 
 import { holidaysBetween } from './holidays';
 import type { VacationDay } from './vacation-days';
 import { MAX_REQUEST_DAYS, countDeductedDays, listVacationDays, rangeLength } from './vacation-days';
-
-// TODO: read the employee's real balance from Firestore once the login is connected.
-const EXAMPLE_AVAILABLE_DAYS = 12;
 
 const WEEKDAYS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -20,12 +18,15 @@ const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', '
   styleUrls: ['vacation-request.page.scss'],
   imports: [IonContent, IonInput, IonTextarea, IonButton],
 })
-export class VacationRequestPage {
+export class VacationRequestPage implements OnInit {
   private readonly toast = inject(ToastController);
   private readonly store = inject(RequestsStore);
   private readonly router = inject(Router);
 
-  readonly availableDays = EXAMPLE_AVAILABLE_DAYS;
+  readonly availableDays = signal(12); 
+  readonly userEmail = signal<string | null>(null);
+  readonly userName = signal<string>('Andrey Rojas'); // Para almacenar el nombre del colaborador
+
   readonly start = signal('');
   readonly end = signal('');
   readonly comment = signal('');
@@ -47,7 +48,7 @@ export class VacationRequestPage {
     return listVacationDays(this.start(), lastDay, holidaysBetween(this.start(), lastDay));
   });
   readonly deducted = computed(() => countDeductedDays(this.days()));
-  readonly remaining = computed(() => this.availableDays - this.deducted());
+  readonly remaining = computed(() => this.availableDays() - this.deducted());
   readonly dayRows = computed(() => this.days().map((day) => toRow(day)));
   readonly balanceLabel = computed(() => (this.remaining() < 0 ? 'Le faltarían' : 'Le quedarían'));
   readonly deductedText = computed(() => dayCount(this.deducted()));
@@ -59,11 +60,61 @@ export class VacationRequestPage {
     if (this.end() === this.start()) return 'La fecha de reincorporación debe ser posterior al primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';
     if (this.deducted() === 0) return 'Las fechas elegidas no incluyen días laborales.';
-    if (this.remaining() < 0) return `Solo tiene ${this.availableDays} días disponibles.`;
+    if (this.remaining() < 0) return `Solo tiene ${this.availableDays()} días disponibles.`;
     return '';
   });
 
   readonly canSubmit = computed(() => this.days().length > 0 && !this.error());
+
+  async ngOnInit(): Promise<void> {
+    console.log('[VacationRequest] ngOnInit: Obteniendo colaborador actual desde el store...');
+
+    try {
+      const worker = await this.store.currentWorker();
+      console.log('[VacationRequest] Datos del colaborador obtenidos del store:', worker);
+
+      if (worker && (worker as any).uid) {
+        const uid = (worker as any).uid;
+        console.log(`[VacationRequest] UID del usuario logueado detectado: ${uid}`);
+
+        // Obtener la instancia de Firestore y consultar directamente la colección 'colaboradores' usando el UID
+        const db = getFirestore();
+        const colaboradorRef = doc(db, 'colaboradores', uid);
+        const snapshot = await getDoc(colaboradorRef);
+
+        if (snapshot.exists()) {
+          const colaboradorData = snapshot.data();
+          console.log('[VacationRequest] MATCH ENCONTRADO en Firestore - Datos del colaborador:', colaboradorData);
+
+          // Extraer nombre si está disponible
+          if (colaboradorData['nombre']) {
+            this.userName.set(colaboradorData['nombre']);
+          }
+
+          // Extraer correo si está disponible
+          if (colaboradorData['correo']) {
+            console.log(`[VacationRequest] Correo detectado: ${colaboradorData['correo']}`);
+            this.userEmail.set(colaboradorData['correo']);
+          }
+
+          // Extraer vacaciones disponibles directamente de Firestore
+          if (typeof colaboradorData['vacaciones_disponibles'] === 'number') {
+            const dias = colaboradorData['vacaciones_disponibles'];
+            console.log(`[VacationRequest] Vacaciones disponibles encontradas: ${dias}`);
+            this.availableDays.set(dias);
+          } else {
+            console.warn('[VacationRequest] El campo "vacaciones_disponibles" no es un número válido en Firestore.');
+          }
+        } else {
+          console.warn(`[VacationRequest] No se encontró ningún documento en la colección 'colaboradores' con el ID: ${uid}`);
+        }
+      } else {
+        console.warn('[VacationRequest] No se encontró un trabajador activo o el objeto no tiene UID.');
+      }
+    } catch (err) {
+      console.error('[VacationRequest] Error al consultar Firestore en ngOnInit:', err);
+    }
+  }
 
   setStart(value: string | null | undefined): void {
     this.start.set(value ?? '');
@@ -81,12 +132,38 @@ export class VacationRequestPage {
     if (!this.canSubmit()) return;
     const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
     const days = this.deductedText();
+    
+    console.log('[VacationRequest] Enviando solicitud de vacaciones con balance:', this.availableDays());
+
+    // 1. Guardar de forma local en tu store (tal como lo hacías)
     this.store.addVacation(worker, {
       start: this.start(),
       returnDate: this.end(),
-      balance: this.availableDays,
+      balance: this.availableDays(),
       comment: this.comment(),
     });
+
+    // 2. Guardar en la colección 'vacations_requests' de Firestore
+    try {
+      const db = getFirestore();
+      const requestsRef = collection(db, 'vacations_requests');
+
+      const vacationRequestData = {
+        fechaSolicitud: serverTimestamp(),
+        diasSolicitados: this.deducted(),
+        diaInicio: this.start(),
+        diaFin: this.end(), // Corresponde al día de reincorporación seleccionado
+        comentarioRRHH: this.comment() || '',
+        nombreSolicitante: (worker as any).name || this.userName(),
+        correoSolicitante: this.userEmail() || (worker as any).correo || 'alonsorojasdelga@hotmail.com',
+      };
+
+      await addDoc(requestsRef, vacationRequestData);
+      console.log('[VacationRequest] Solicitud guardada exitosamente en Firestore (vacations_requests).');
+    } catch (firebaseError) {
+      console.error('[VacationRequest] Error al guardar en Firestore vacations_requests:', firebaseError);
+    }
+
     this.start.set('');
     this.end.set('');
     this.comment.set('');

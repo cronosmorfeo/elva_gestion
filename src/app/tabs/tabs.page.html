@@ -20,6 +20,9 @@
         <a routerLink="/tabs/dashboard">Panel de administración</a>
         }
       </div>
+      @if (notifyState() === 'off') {
+      <button type="button" class="notify" (click)="enableNotifications()">Activar notificaciones</button>
+      }
       <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
     </nav>
   </ion-toolbar>
@@ -27,3 +30,4 @@
 }
 
 <ion-tabs></ion-tabs>
+<app-notification-cards />

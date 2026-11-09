@@ -5,6 +5,7 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 export interface Worker {
   uid: string;
   name: string;
+  email?: string;
 }
 
 // The signed-in worker, with the name saved in colaboradores. Null without a session.
@@ -21,5 +22,5 @@ export async function currentWorker(): Promise<Worker | null> {
   } catch {
     // Keeps the email as the name if the profile cannot be read.
   }
-  return { uid: user.uid, name };
+  return { uid: user.uid, name, email: user.email ?? undefined };
 }

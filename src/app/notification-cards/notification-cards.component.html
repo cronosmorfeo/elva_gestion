@@ -1,0 +1,13 @@
+<div class="stack" aria-live="polite">
+  @for (card of cards(); track card.key) {
+    <div class="card">
+      <img src="assets/icon/logo.png" alt="" class="logo" />
+      <div class="text">
+        <strong>{{ card.title }}</strong>
+        <p>{{ card.body }}</p>
+        <button type="button" class="open" (click)="open(card)">{{ card.action }}</button>
+      </div>
+      <button type="button" class="close" (click)="dismiss(card.key)" aria-label="Cerrar notificación">×</button>
+    </div>
+  }
+</div>

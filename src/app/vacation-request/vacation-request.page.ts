@@ -135,14 +135,6 @@ export class VacationRequestPage implements OnInit {
     
     console.log('[VacationRequest] Enviando solicitud de vacaciones con balance:', this.availableDays());
 
-    // 1. Guardar de forma local en tu store (tal como lo hacías)
-    this.store.addVacation(worker, {
-      start: this.start(),
-      returnDate: this.end(),
-      balance: this.availableDays(),
-      comment: this.comment(),
-    });
-
     // 2. Guardar en la colección 'vacations_requests' de Firestore
     try {
       const db = getFirestore();
@@ -155,7 +147,8 @@ export class VacationRequestPage implements OnInit {
         diaFin: this.end(), // Corresponde al día de reincorporación seleccionado
         comentarioRRHH: this.comment() || '',
         nombreSolicitante: (worker as any).name || this.userName(),
-        correoSolicitante: this.userEmail() || (worker as any).correo || 'alonsorojasdelga@hotmail.com',
+        correoSolicitante: this.userEmail() || (worker as any).correo || '',
+        uid: worker.uid,
       };
 
       await addDoc(requestsRef, vacationRequestData);

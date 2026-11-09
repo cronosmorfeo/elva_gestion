@@ -42,9 +42,7 @@ export class MyRequestsPage {
   }
 
   private async load(): Promise<void> {
-    const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
-    this.store.addExamplesFor(worker);
-    this.worker.set(worker);
+    this.worker.set(await this.store.currentWorker());
     this.loading.set(false);
   }
 }

@@ -1,17 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { IonButton, IonContent, IonTextarea, ToastController } from '@ionic/angular';
 
-import type { ReportFile } from './report-utils';
-import { MAX_FILES, addWeeks, fileKind, formatFileSize, mondayOf, reportProblem, weekLabel } from './report-utils';
+import { RequestsStore } from '../services/requests-store';
 
-interface SentReport {
-  id: string;
-  week: string;
-  text: string;
-  files: ReportFile[];
-  seen: boolean;
-  sample: boolean;
-}
+import { MAX_FILES, addWeeks, fileKind, formatFileSize, mondayOf, reportProblem, weekLabel } from './report-utils';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 const localToday = (): string => {
@@ -19,9 +11,8 @@ const localToday = (): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-// Optional weekly report. Only the worker and the admins can read it.
-// TODO: save the text in Firestore (reportes) and the files in Firebase Storage
-// (reportes/{uid}/...). The rules must let only the owner and admin/rh read them.
+// Optional weekly report, saved in Firestore (weekly_reports). Only the worker and the admins can read it.
+// TODO: upload the files to Firebase Storage (needs the Blaze plan); today only their names are saved.
 @Component({
   selector: 'app-weekly-report',
   templateUrl: 'weekly-report.page.html',
@@ -30,6 +21,7 @@ const localToday = (): string => {
 })
 export class WeeklyReportPage {
   private readonly toast = inject(ToastController);
+  private readonly store = inject(RequestsStore);
   private readonly thisWeek = mondayOf(localToday());
 
   readonly maxFiles = MAX_FILES;
@@ -42,16 +34,8 @@ export class WeeklyReportPage {
   readonly week = signal(this.thisWeek);
   readonly text = signal('');
   readonly files = signal<File[]>([]);
-  readonly sent = signal<SentReport[]>([
-    {
-      id: 'ejemplo',
-      week: weekLabel(addWeeks(this.thisWeek, -1)),
-      text: 'Ejemplo: terminé el informe de tiquetes y lo compartí con el equipo.',
-      files: [{ name: 'tiquetes.pdf', size: 310 * 1024, type: 'application/pdf' }],
-      seen: true,
-      sample: true,
-    },
-  ]);
+  readonly sending = signal(false);
+  readonly uid = signal('');
 
   readonly fileRows = computed(() =>
     this.files().map((f, i) => ({ index: i, name: f.name, kind: fileKind(f), size: formatFileSize(f.size) })),
@@ -60,11 +44,22 @@ export class WeeklyReportPage {
   // Shows the problem only once the person started; an empty form just keeps the button off.
   readonly visibleProblem = computed(() => (this.text() || this.files().length ? this.problem() : ''));
   readonly sentRows = computed(() =>
-    this.sent().map((r) => ({
-      ...r,
-      attachments: r.files.map((f) => `${f.name} · ${formatFileSize(f.size)}`),
-    })),
+    this.store
+      .reports()
+      .filter((r) => r.employeeId === this.uid())
+      .map((r) => ({
+        id: r.id,
+        week: weekLabel(r.weekStart),
+        text: r.text,
+        seen: r.seen,
+        sample: false,
+        attachments: r.files.map((f) => `${f.name} · ${formatFileSize(f.size)}`),
+      })),
   );
+
+  constructor() {
+    void this.store.currentWorker().then((w) => this.uid.set(w?.uid ?? ''));
+  }
 
   setWeek(event: Event): void {
     this.week.set((event.target as HTMLSelectElement).value);
@@ -86,23 +81,23 @@ export class WeeklyReportPage {
   }
 
   async submit(): Promise<void> {
-    if (this.problem()) return;
-    const report: SentReport = {
-      id: String(Date.now()),
-      week: weekLabel(this.week()),
-      text: this.text().trim(),
-      files: this.files().map((f) => ({ name: f.name, size: f.size, type: f.type })),
-      seen: false,
-      sample: false,
-    };
-    this.sent.update((list) => [report, ...list]);
-    this.text.set('');
-    this.files.set([]);
-    const toast = await this.toast.create({
-      message: 'Reporte listo. Todavía no se guarda: falta conectar la base de datos.',
-      duration: 4000,
-      position: 'bottom',
-    });
+    if (this.problem() || this.sending()) return;
+    const files = this.files().map((f) => ({ name: f.name, size: f.size, type: f.type }));
+    this.sending.set(true);
+    let message = files.length
+      ? 'Reporte enviado. Los archivos todavía no se suben: por ahora solo se guarda su nombre.'
+      : 'Reporte enviado.';
+    try {
+      await this.store.sendReport({ week: this.week(), text: this.text(), files });
+      this.text.set('');
+      this.files.set([]);
+    } catch (err) {
+      console.error('[WeeklyReport] Could not save the report:', err);
+      message = 'No se pudo enviar el reporte. Revise la conexión e intente de nuevo.';
+    } finally {
+      this.sending.set(false);
+    }
+    const toast = await this.toast.create({ message, duration: 5000, position: 'bottom' });
     await toast.present();
   }
 }

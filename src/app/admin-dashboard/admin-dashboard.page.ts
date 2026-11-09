@@ -7,8 +7,8 @@ import { collection, doc, getDoc, getDocs, getFirestore, serverTimestamp, update
 import type { NoticeInput } from '../notices/notice-utils';
 import { MAX_NOTICE_MESSAGE, MAX_NOTICE_TITLE, noticeProblem } from '../notices/notice-utils';
 import { fileKind, formatFileSize, unseenCount, weekLabel } from '../reports/report-utils';
-import type { WorkReport } from '../reports/report-utils';
 import { AuthService } from '../services/auth';
+import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 import {
   currencySymbol,
@@ -34,7 +34,7 @@ import {
   msUntilMidnight,
   quincenaLabel,
 } from './admin-dates';
-import type { PendingPayment, RequestStatus } from './admin-requests';
+import type { PendingPayment, RequestStatus, VacationRequest } from './admin-requests';
 import {
   formatColones,
   formatHours,
@@ -47,7 +47,7 @@ import {
   upcomingHolidays,
   vacationDays,
 } from './admin-requests';
-import { SAMPLE_EMPLOYEES, SAMPLE_PAYEES, SAMPLE_PAYMENTS, SAMPLE_REPORTS } from './admin-sample-data';
+import { SAMPLE_EMPLOYEES, SAMPLE_PAYEES, SAMPLE_PAYMENTS } from './admin-sample-data';
 
 interface Employee {
   id: string;
@@ -66,6 +66,7 @@ interface Employee {
   salario: number | null;
   moneda: string;
   pais: string;
+  vacationBalance: number | null;
 }
 
 interface EditForm {
@@ -165,7 +166,9 @@ export class AdminDashboardPage {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
   private readonly store = inject(RequestsStore);
+  private readonly notifications = inject(NotificationsService);
 
+  readonly notifyState = this.notifications.state;
   readonly sections = SECTIONS;
   readonly roleOptions = ROLE_OPTIONS;
   readonly countryOptions = COUNTRY_OPTIONS;
@@ -182,7 +185,7 @@ export class AdminDashboardPage {
   readonly profileRole = signal('');
   readonly profileInitials = computed(() => initials(this.profileName() || 'Admin'));
 
-  // Shared with the worker pages, so decisions show up in "Mis solicitudes".
+  // Live from Firestore, shared with the worker pages, so decisions show up in "Mis solicitudes".
   readonly vacations = this.store.vacations;
   readonly overtime = this.store.overtime;
 
@@ -233,10 +236,8 @@ export class AdminDashboardPage {
 
   readonly employees = signal<Employee[]>([]);
 
-  // Weekly reports. Only the worker and the admins may read them.
-  // TODO: load from Firestore (reportes) and Storage; the rules must allow reading
-  // only to the owner (request.auth.uid == employeeId) and to admin/rh, never to coworkers.
-  readonly reports = signal<WorkReport[]>(SAMPLE_REPORTS);
+  // Weekly reports from Firestore. Only the worker and the admins may read them (rules still to do).
+  readonly reports = this.store.reports;
   readonly unseenReports = computed(() => this.reports().filter((r) => !r.seen).length);
   readonly openReportsId = signal<string | null>(null);
   readonly reportHistory = computed(() => {
@@ -290,7 +291,7 @@ export class AdminDashboardPage {
       .map((r) => ({
         id: r.id,
         employee: r.employee,
-        balance: dayCount(r.balance),
+        balance: balanceText(r, this.employees()),
         start: formatShortDate(r.start),
         returnDate: formatShortDate(r.returnDate),
         days: vacationDays(r),
@@ -410,14 +411,14 @@ export class AdminDashboardPage {
   async decideVacation(id: string, status: RequestStatus): Promise<void> {
     const request = this.vacations().find((r) => r.id === id);
     if (!request) return;
-    this.store.decideVacation(id, status);
+    if (!(await this.saved(this.store.decideVacation(id, status)))) return;
     await this.logDecision(`las vacaciones de ${request.employee}`, status);
   }
 
   async decideOvertime(id: string, status: RequestStatus): Promise<void> {
     const request = this.overtime().find((r) => r.id === id);
     if (!request) return;
-    this.store.decideOvertime(id, status);
+    if (!(await this.saved(this.store.decideOvertime(id, status)))) return;
     await this.logDecision(`las horas extra de ${request.employee}`, status);
   }
 
@@ -452,7 +453,7 @@ export class AdminDashboardPage {
     const f = this.noticeForm();
     if (!f || this.noticeError()) return;
     const author = this.profileName() || 'Administración';
-    this.store.saveNotice(f, author, f.id ?? undefined);
+    if (!(await this.saved(this.store.saveNotice(f, author, f.id ?? undefined)))) return;
     this.noticeForm.set(null);
     await this.log(
       `${this.profileName() || 'Vos'} ${f.id ? 'editó' : 'publicó'} el aviso "${f.title.trim()}"`,
@@ -464,7 +465,7 @@ export class AdminDashboardPage {
     const notice = this.store.notices().find((n) => n.id === id);
     this.confirmDeleteId.set(null);
     if (!notice) return;
-    this.store.deleteNotice(id);
+    if (!(await this.saved(this.store.deleteNotice(id)))) return;
     await this.log(`${this.profileName() || 'Vos'} borró el aviso "${notice.title}"`, 'Aviso borrado.');
   }
 
@@ -535,20 +536,20 @@ export class AdminDashboardPage {
   }
 
   // Admins can only mark a report as seen. Questions go to the person by Slack.
-  markSeen(reportId: string): void {
+  async markSeen(reportId: string): Promise<void> {
     const report = this.reports().find((r) => r.id === reportId);
     if (!report || report.seen) return;
-    this.reports.update((list) => list.map((r) => (r.id === reportId ? { ...r, seen: true } : r)));
+    if (!(await this.saved(this.store.markReportsSeen([reportId])))) return;
     this.addActivity(
       `${this.profileName() || 'Vos'} vio el reporte de ${report.employee} (${weekLabel(report.weekStart).toLowerCase()})`,
     );
   }
 
-  markAllSeen(): void {
+  async markAllSeen(): Promise<void> {
     const history = this.reportHistory();
     if (!history || history.unseen === 0) return;
-    const id = history.employee.id;
-    this.reports.update((list) => list.map((r) => (r.employeeId === id ? { ...r, seen: true } : r)));
+    const ids = history.items.filter((r) => !r.seen).map((r) => r.id);
+    if (!(await this.saved(this.store.markReportsSeen(ids)))) return;
     this.addActivity(`${this.profileName() || 'Vos'} vio ${history.unseen} reporte(s) de ${history.employee.name}`);
   }
 
@@ -684,10 +685,39 @@ export class AdminDashboardPage {
     }
   }
 
+  async enableNotifications(): Promise<void> {
+    const uid = getAuth().currentUser?.uid;
+    if (!uid) return;
+    const toast = await this.toast.create({
+      message: notifyMessage(await this.notifications.enable(uid)),
+      duration: 5000,
+      position: 'bottom',
+    });
+    await toast.present();
+  }
+
   async logout(): Promise<void> {
+    await this.notifications.disable();
     await this.auth.logout();
     this.store.forgetWorker();
     await this.router.navigateByUrl('/tabs/login', { replaceUrl: true });
+  }
+
+  // Waits for a Firestore write. On failure it warns the admin and returns false, so nothing is marked as done.
+  private async saved(write: Promise<void>): Promise<boolean> {
+    try {
+      await write;
+      return true;
+    } catch (err) {
+      console.error('[AdminDashboard] Could not save to Firestore:', err);
+      const toast = await this.toast.create({
+        message: 'No se pudo guardar. Revisá la conexión e intentá de nuevo.',
+        duration: 4000,
+        position: 'bottom',
+      });
+      await toast.present();
+      return false;
+    }
   }
 
   private async logDecision(what: string, status: RequestStatus): Promise<void> {
@@ -754,6 +784,7 @@ export class AdminDashboardPage {
           salario: typeof data['salario'] === 'number' ? data['salario'] : null,
           moneda: String(data['moneda'] ?? ''),
           pais: String(data['pais'] ?? ''),
+          vacationBalance: typeof data['vacaciones_disponibles'] === 'number' ? data['vacaciones_disponibles'] : null,
         };
       });
       const samples = SAMPLE_EMPLOYEES.map((e) => ({
@@ -772,6 +803,7 @@ export class AdminDashboardPage {
         salario: e.salario ?? null,
         moneda: 'CRC',
         pais: 'CR',
+        vacationBalance: null,
       }));
       list.push(...samples);
       list.sort((a, b) => Number(a.sample) - Number(b.sample) || a.name.localeCompare(b.name, 'es'));
@@ -787,6 +819,14 @@ function countByStatus(list: { status: RequestStatus }[]): Record<RequestStatus,
   const counts: Record<RequestStatus, number> = { pendiente: 0, aprobada: 0, rechazada: 0 };
   for (const r of list) counts[r.status]++;
   return counts;
+}
+
+// Requests from Firestore do not carry the balance; it comes from the employee, found by email.
+function balanceText(request: VacationRequest, employees: Employee[]): string {
+  const balance = Number.isFinite(request.balance)
+    ? request.balance
+    : employees.find((e) => e.email && e.email === request.email)?.vacationBalance;
+  return typeof balance === 'number' ? dayCount(balance) : 'sin dato';
 }
 
 function dayCount(n: number): string {

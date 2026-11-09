@@ -16,6 +16,7 @@ export interface VacationRequest {
   status: RequestStatus;
   // Set when a worker sends the request from the app.
   ownerId?: string;
+  email?: string;
   comment?: string;
   sentAt?: string; // YYYY-MM-DDTHH:mm
   sample?: boolean;
@@ -30,6 +31,7 @@ export interface OvertimeRequest {
   rhReviewed: boolean;
   status: RequestStatus;
   ownerId?: string;
+  email?: string;
   sentAt?: string;
   sample?: boolean;
 }

@@ -1,0 +1,105 @@
+// Fixed light colors: the card looks the same in dark mode.
+.stack {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 30000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 12px 14px 16px;
+  border-left: 5px solid #008f82;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1d2b2a;
+  box-shadow: 0 10px 30px rgba(0, 60, 54, 0.22);
+  pointer-events: auto;
+  animation: slide-in 0.25s ease-out;
+}
+
+.logo {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #e3f3f1;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+strong {
+  display: block;
+  color: #00756b;
+  font-size: 0.95rem;
+}
+
+p {
+  margin: 4px 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.open {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #008f82;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: #00756b;
+  }
+}
+
+.close {
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: #6b7a78;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.open:focus-visible,
+.close:focus-visible {
+  outline: 2px solid #5ce1e6;
+  outline-offset: 2px;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .stack {
+    top: 64px;
+    right: 12px;
+    width: calc(100vw - 24px);
+  }
+}

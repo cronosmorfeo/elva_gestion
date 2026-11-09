@@ -44,6 +44,9 @@
             <span>{{ profileRole() || 'Administración' }}</span>
           </div>
         </div>
+        @if (notifyState() === 'off') {
+        <button type="button" class="logout" (click)="enableNotifications()">Activar notificaciones</button>
+        }
         <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
       </div>
     </aside>

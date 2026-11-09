@@ -31,6 +31,7 @@ export class OvertimeRequestPage {
   readonly start = signal('');
   readonly end = signal('');
   readonly task = signal('');
+  readonly sending = signal(false);
 
   readonly days = computed(() => overtimeDays(this.start(), this.end(), holidaysBetween(this.start(), this.end())));
   readonly totalMinutes = computed(() => this.days().reduce((sum, day) => sum + day.minutes, 0));
@@ -65,10 +66,23 @@ export class OvertimeRequestPage {
   }
 
   async submit(): Promise<void> {
-    if (!this.canSubmit()) return;
-    const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
+    if (!this.canSubmit() || this.sending()) return;
     const total = this.totalText();
-    this.store.addOvertime(worker, { start: this.start(), end: this.end(), task: this.task() });
+    this.sending.set(true);
+    try {
+      await this.store.addOvertime({ start: this.start(), end: this.end(), task: this.task() });
+    } catch (err) {
+      console.error('[OvertimeRequest] Could not save the request:', err);
+      const failed = await this.toast.create({
+        message: 'No se pudo enviar la solicitud. Revise la conexión e intente de nuevo.',
+        duration: 5000,
+        position: 'bottom',
+      });
+      await failed.present();
+      return;
+    } finally {
+      this.sending.set(false);
+    }
     this.start.set('');
     this.end.set('');
     this.task.set('');

@@ -7,12 +7,12 @@ Internal Human Resources app for ELVA IA. Employees submit requests (vacation an
 | Section | Route | What it does |
 | --- | --- | --- |
 | Navbar | Top of the worker pages | Shown only after sign-in. Links to Vacaciones, Horas extra, Mi reporte, Mis solicitudes and Avisos (with the number of new notices), "Panel de administración" for admin/HR, and "Cerrar sesión". Hidden on login, the dashboard and Tab 3, which have their own header. |
-| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. Signed-in users only. The balance is example data. A sent request shows up in Mis solicitudes and in the dashboard. |
-| Overtime request | `/tabs/horas-extra` | Pick a start and end (it can cross midnight), describe the work and see the hours per day with their pay rate. Signed-in users only. A sent request shows up in Mis solicitudes and in the dashboard. |
-| Admin dashboard | `/tabs/dashboard` | Admin and HR only. Fixed side menu, today's date, request summary, vacation and overtime approvals, pending payments, real employee list and upcoming holidays. Edit an employee's data and read each employee's weekly reports (mark them as seen). Approve or reject requests and manage notices. Requests and notices are shared with the worker pages in memory (`RequestsStore`) and are lost on reload; payments and reports are sample data; only employee edits are saved to Firestore. |
+| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. Signed-in users only. The balance comes from `colaboradores.vacaciones_disponibles`. Requests are saved in Firestore (`vacations_requests`) and show up in Mis solicitudes and in the dashboard. |
+| Overtime request | `/tabs/horas-extra` | Pick a start and end (it can cross midnight), describe the work and see the hours per day with their pay rate. Signed-in users only. Requests are saved in Firestore (`overtime_requests`) and show up in Mis solicitudes and in the dashboard. |
+| Admin dashboard | `/tabs/dashboard` | Admin and HR only. Fixed side menu, today's date, request summary, vacation and overtime approvals, pending payments, real employee list and upcoming holidays. Edit an employee's data and read each employee's weekly reports (mark them as seen). Approve or reject requests and manage notices. Requests, notices and reports are read from Firestore and update live (`RequestsStore`); payments are still sample data. |
 | My requests | `/tabs/solicitudes` | Signed-in users only. The worker's own vacation and overtime requests (filter by type) with their status: pending, approved or rejected. |
 | Notices | `/tabs/avisos` | Signed-in users only. Notices published by admin/HR, important ones on top. Admins create, edit and delete them in the dashboard. |
-| Weekly report | `/tabs/reporte` | Signed-in workers only. Optional: pick the week, write what they did and/or attach any files. Reports are not saved yet. |
+| Weekly report | `/tabs/reporte` | Signed-in workers only. Optional: pick the week, write what they did and/or attach any files. Reports are saved in Firestore (`weekly_reports`); attached files are not uploaded yet, only their names are saved (Storage needs the Blaze plan). |
 | Login (Tab 1) | `/tabs/login` | Sign-in with Firebase Authentication. Workers go to Vacaciones; admin/HR go to the dashboard. |
 | Push test (Tab 2) | `/tabs/tab2` | **Temporary** page to test push notifications with an anonymous user. To be replaced once the login is connected. |
 | Users (Tab 3) | `/tabs/tab3` | Admin panel to create employees in Firebase Authentication and Firestore. |
@@ -95,42 +95,51 @@ The Firebase web config is not secret, but it is kept out of the repository so e
 ```
 src/
 ├── main.ts                        # Bootstrap: initializes Firebase and Angular
-├── firebase-messaging-sw.js       # Push notifications service worker
+├── firebase-messaging-sw.js       # Notifications service worker (push, image and button)
 ├── environments/
 │   └── environment.example.ts     # Config template (copy it, see Getting started)
-├── assets/icon/logo.png           # ELVA logo
+├── assets/
+│   ├── icon/logo.png              # ELVA logo
+│   └── notifications/banner.png   # Image shown inside system notifications
 └── app/
     ├── app.routes.ts              # Main routes
     ├── tabs/                      # Tab bar, navbar and their routes
     ├── auth/                      # Sign-in guard (not connected yet)
     ├── vacation-request/          # Vacation request page and Costa Rica holidays
     ├── overtime-request/          # Overtime request page
-    ├── admin-dashboard/           # Admin dashboard (sample requests and payments)
+    ├── admin-dashboard/           # Admin dashboard (payments are sample data)
     ├── reports/                   # Weekly report page and helpers
     ├── my-requests/               # My requests page (worker)
     ├── notices/                   # Notices page and helpers
     ├── login/                     # Sign-in screen (Tab 1)
     ├── tab2/                      # Push test page, temporary (Tab 2)
     ├── tab3/                      # Users panel (Tab 3)
+    ├── notification-cards/        # In-page notification cards
     └── services/
+        ├── requests-store.ts          # Live Firestore data: requests, notices, reports
+        ├── firestore-mappers.ts       # Firestore documents -> page types
+        ├── notification-events.ts     # What to notify, and to whom
+        ├── notifications.ts           # Shows cards and system notifications
         └── push-notification.service.ts
+functions/                         # Cloud Functions for push with the page closed (not deployed)
 ```
 
-## Push notifications
+## Notifications
 
-Notifications use Firebase Cloud Messaging (FCM) and work even when the page is closed.
+| Who | When |
+| --- | --- |
+| Admin/HR | A worker sends a vacation or overtime request. |
+| Worker | One of their requests is approved or rejected, or a new notice is published. |
 
-1. **Enable:** the user taps "Activar avisos" and grants permission. The browser gets a **token** (its address for receiving notifications) and `PushNotificationService` saves it in `users/{uid}/fcmTokens/{token}`.
-2. **Send:** FCM delivers the notification to that token. Today it is sent manually from the Firebase console; later a Cloud Function will send it when a request changes.
-3. **Receive:** with the page open, the notification shows inside the app. With the page closed, the service worker shows it. Tapping it opens the page.
+Weekly reports do not notify; admins read them in the dashboard.
 
-The service worker holds no credentials: it receives them in its URL when registered, from `environment.firebase`.
+1. **Enable:** the user taps **Activar notificaciones** (navbar or dashboard) and grants permission. If push is set up, the browser also gets a **token** and `PushNotificationService` saves it in `users/{uid}/fcmTokens/{token}`.
+2. **With the page open:** `RequestsStore` sees the change in Firestore and `NotificationsService` shows it. If the page is visible, it is an in-page card (`notification-cards`); otherwise, a system notification with the banner image and a "Ver solicitud" button.
+3. **With the page closed:** the Cloud Functions in `functions/` send a push and the service worker shows it. They are **not deployed yet**: they need the Blaze plan and a VAPID key (see `functions/README.md`).
 
-**To test it:**
+Both ways use the same notification tag, so the browser shows only one. The service worker holds no credentials: it receives them in its URL when registered, from `environment.firebase`. The look of system notifications (colors, corners, font) is set by the operating system; only the image and the button can be added.
 
-1. Open `localhost:4200/tabs/tab2` in **Chrome or Edge**. It does not work by default in Brave or in incognito windows.
-2. Tap **Activar avisos** and grant permission.
-3. In Firebase, go to **Messaging**, create a campaign and use **Send test message** with the token shown on the page.
+**To test it:** open the app in two browsers (for example Chrome as a worker and Edge as an admin), tap **Activar notificaciones** in both, then send a request from the worker and decide it from the admin.
 
 ## Vacation days
 
@@ -149,18 +158,24 @@ The service worker holds no credentials: it receives them in its URL when regist
 | Collection | What it stores | Written by |
 | --- | --- | --- |
 | `colaboradores/{uid}` | Name, country, salary, currency, start date, work schedule and email. | Users panel (Tab 3). |
+| `vacations_requests/{id}` | Vacation request: `uid`, `nombreSolicitante`, `correoSolicitante`, `diaInicio`, `diaFin` (return day), `diasSolicitados`, `comentarioRRHH`, `fechaSolicitud`, `estado`, `decision`. | Worker (vacation page); admin/HR set `estado` and `decision`. |
+| `overtime_requests/{id}` | Overtime request: `uid`, `nombreSolicitante`, `correoSolicitante`, `inicio`, `fin`, `tarea`, `estado`, `fechaSolicitud`, `decision`. | Worker (overtime page); admin/HR decide. |
+| `notices/{id}` | Notice: `titulo`, `mensaje`, `importante`, `autor`, `autorUid`, `createdAt`, `updatedAt`. | Admin/HR (dashboard). |
+| `weekly_reports/{id}` | Weekly report: `uid`, `nombre`, `semana` (Monday), `texto`, `archivos` (name, size, type), `visto`, `fechaEnvio`. | Worker; admin/HR set `visto`. |
 | `users/{uid}/fcmTokens/{token}` | Notification token per browser (`createdAt`, `userAgent`). | `PushNotificationService`. |
+
+`estado` is `pendiente`, `aprobada` or `rechazada` (missing means pending). `decision` and `visto` are `{ por: uid, fecha }`.
 
 ## Security
 
 - **Credentials:** `environment.ts` and `environment.prod.ts` are not committed (see [Getting started](#getting-started)).
 - **Firestore rules:** the repository's `firestore.rules` allows all reads and writes (`allow read, write: if true`). It is for development only. **Before loading real data**, publish rules that restrict access by user and role, since `colaboradores` stores salaries.
-- **Sign-in:** for now the navbar and the request pages are visible without signing in. `authGuard` in `src/app/auth` is ready and will be connected once the login works.
+- **Sign-in:** the navbar and the worker pages need a session (`authGuard`).
 - **Admin dashboard:** `adminGuard` only lets in users whose `tipo_colaborador` is `admin` or `rh`. It hides the page in the app, but the Firestore rules must also restrict `colaboradores` and the requests to those roles.
-- **Requests and notices:** a worker may read only their own requests; only admin/HR may decide requests and write notices; every signed-in user may read notices. `RequestsStore` keeps them in memory until they are saved in Firestore with rules that enforce this.
-- **Weekly reports:** only the worker who sent a report and admin/HR may read it, never coworkers. When reports are saved, the Firestore rules (`reportes`) and the Storage rules for the attached files must enforce that.
+- **Requests and notices:** a worker may read only their own requests; only admin/HR may decide requests and write notices; every signed-in user may read notices. The app already asks only for the worker's own documents (`where uid == me`), but only the Firestore rules can enforce it.
+- **Weekly reports:** only the worker who sent a report and admin/HR may read it, never coworkers. The Firestore rules (`weekly_reports`), and the Storage rules once files are uploaded, must enforce that.
 - **Anonymous sign-in:** disable it in Firebase once the push test page is removed.
-- **Notifications:** notification text must not include sensitive data, because it shows on the lock screen.
+- **Notifications:** notification text must not include sensitive data, because it shows on the lock screen. The rules must let each user write only their own tokens in `users/{uid}/fcmTokens`.
 
 ## Contributing
 

@@ -4,6 +4,23 @@ import { formatHours, overtimeMinutes, overtimePay, vacationDays } from '../admi
 
 export type RequestKind = 'vacaciones' | 'horas';
 
+export const ALL_MONTHS = 'todos';
+
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
 export interface RequestRow {
   id: string;
   title: string;
@@ -13,6 +30,49 @@ export interface RequestRow {
   status: RequestStatus;
   statusText: string;
   sample: boolean;
+  month: string; // YYYY-MM of the vacation or overtime date (not of when it was sent)
+  start: string; // YYYY-MM-DD (vacations) or YYYY-MM-DDTHH:mm (overtime), to know if it can still be cancelled
+  returnDays: number; // days that go back to the balance if an approved vacation is cancelled
+}
+
+export interface MonthOption {
+  value: string;
+  label: string;
+}
+
+// Months that have requests, newest first, with how many there are and how many are pending.
+export function monthOptions(rows: RequestRow[]): MonthOption[] {
+  const byMonth = new Map<string, { total: number; pending: number }>();
+  for (const r of rows) {
+    const m = byMonth.get(r.month) ?? { total: 0, pending: 0 };
+    m.total++;
+    if (r.status === 'pendiente') m.pending++;
+    byMonth.set(r.month, m);
+  }
+  const months = [...byMonth.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([value, { total, pending }]) => ({
+      value,
+      label:
+        `${monthLabel(value)} · ${total} ${total === 1 ? 'solicitud' : 'solicitudes'}` +
+        (pending ? ` · ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}` : ''),
+    }));
+  return [...months, { value: ALL_MONTHS, label: 'Todos los meses' }];
+}
+
+// The current month if it has requests; otherwise the newest month that has any.
+export function defaultMonth(options: MonthOption[], today: string): string {
+  const current = today.slice(0, 7);
+  return options.find((o) => o.value === current)?.value ?? options[0]?.value ?? ALL_MONTHS;
+}
+
+export function inMonth(rows: RequestRow[], month: string): RequestRow[] {
+  return month === ALL_MONTHS ? rows : rows.filter((r) => r.month === month);
+}
+
+// "2026-11" -> "Noviembre 2026"
+export function monthLabel(month: string): string {
+  return `${MONTH_NAMES[Number(month.slice(5, 7)) - 1] ?? ''} ${month.slice(0, 4)}`;
 }
 
 const newestFirst = <T extends { start: string; sentAt?: string }>(a: T, b: T): number =>
@@ -21,6 +81,7 @@ const newestFirst = <T extends { start: string; sentAt?: string }>(a: T, b: T): 
 export function statusText(status: RequestStatus, rhReviewed: boolean): string {
   if (status === 'aprobada') return 'Aprobada';
   if (status === 'rechazada') return 'Rechazada';
+  if (status === 'cancelada') return 'Cancelada';
   return rhReviewed ? 'Pendiente' : 'Pendiente · en revisión de RH';
 }
 
@@ -43,6 +104,9 @@ export function vacationRows(list: VacationRequest[], ownerId: string): RequestR
         status: r.status,
         statusText: statusText(r.status, r.rhReviewed),
         sample: r.sample === true,
+        month: r.start.slice(0, 7),
+        start: r.start,
+        returnDays: r.status === 'aprobada' ? (r.deductedDays ?? 0) : 0,
       };
     });
 }
@@ -63,6 +127,9 @@ export function overtimeRows(list: OvertimeRequest[], ownerId: string): RequestR
       status: r.status,
       statusText: statusText(r.status, r.rhReviewed),
       sample: r.sample === true,
+      month: r.start.slice(0, 7),
+      start: r.start,
+      returnDays: 0,
     }));
 }
 

@@ -417,6 +417,146 @@ $red-soft: #fdecea;
     }
   }
 
+  // Home
+  .home-date {
+    margin: 0;
+    color: $muted;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .home-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .home-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    color: $ink;
+    text-decoration: none;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+
+    &:hover {
+      border-color: $teal;
+      box-shadow: 0 4px 14px rgba(0, 117, 107, 0.12);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $teal;
+      outline-offset: 2px;
+    }
+  }
+
+  .home-label {
+    color: $muted;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .home-value {
+    color: $teal-dark;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+
+  .home-sub {
+    overflow: hidden;
+    color: $muted;
+    font-size: 0.85rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .home-go {
+    margin-top: 0.6rem;
+    color: $teal;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .home-upcoming {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .home-item {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+  }
+
+  .home-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 3.2rem;
+    padding: 0.4rem 0;
+    border-radius: 12px;
+    background: $tile;
+    color: $muted;
+    line-height: 1.1;
+
+    b {
+      font-size: 1.15rem;
+    }
+
+    span {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    &.vacaciones {
+      background: $teal-soft;
+      color: $teal-dark;
+    }
+
+    &.horas {
+      background: $amber-soft;
+      color: $amber;
+    }
+  }
+
+  .home-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    span {
+      color: $muted;
+      font-size: 0.85rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .home-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .home-value {
+      font-size: 1.6rem;
+    }
+  }
+
+  .month-field {
+    max-width: 360px;
+    margin-bottom: 1.25rem;
+  }
+
   .request-list,
   .notice-list {
     list-style: none;
@@ -458,6 +598,79 @@ $red-soft: #fdecea;
     &.rechazada {
       background: $red-soft;
       color: $red;
+    }
+
+    &.cancelada {
+      background: $tile;
+      color: $muted;
+    }
+  }
+
+  .cancel-link {
+    align-self: flex-start;
+    margin-top: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: $red;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .cancel-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 10px;
+    background: $red-soft;
+    color: $red;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .cancel-actions {
+    display: flex;
+    gap: 0.5rem;
+
+    button {
+      padding: 0.4rem 0.9rem;
+      border-radius: 99px;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  }
+
+  .cancel-no {
+    border: 1px solid #c5d1cf;
+    background: #ffffff;
+    color: $ink;
+  }
+
+  .cancel-yes {
+    border: 0;
+    background: $red;
+    color: #ffffff;
+  }
+
+  .cancel-link,
+  .cancel-actions button {
+    &:focus-visible {
+      outline: 2px solid $teal;
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
     }
   }
 

@@ -1,6 +1,7 @@
 // Push notifications for ELVA Gestión. Deploying them needs the Blaze plan (see README.md).
 // - Admins (admin/rh): a new vacation or overtime request.
 // - The worker: their request was approved or rejected.
+// - Admins (admin/rh): a worker cancelled a pending or approved request.
 // - Every active worker: a new notice.
 // Tokens live in users/{uid}/fcmTokens/{token}, saved by PushNotificationService in the app.
 // The tag matches the in-page notification, so the browser shows only one if both arrive.
@@ -70,6 +71,36 @@ exports.overtimeDecided = onDocumentUpdated(`${OVERTIME}/{id}`, async (event) =>
   });
 });
 
+exports.vacationCancelled = onDocumentUpdated(`${VACATIONS}/{id}`, async (event) => {
+  const change = cancelledNow(event);
+  if (!change) return;
+  const { request: r, wasApproved } = change;
+  const days = r.cancelacion?.diasDevueltos;
+  const note = !wasApproved
+    ? '.'
+    : days
+      ? ` (estaban aprobadas; se le ${days === 1 ? 'devolvió 1 día' : `devolvieron ${days} días`}).`
+      : ' (estaban aprobadas).';
+  await send(await uidsWithRole(ADMIN_ROLES), {
+    tag: `${VACATIONS}-${event.params.id}-cancelada`,
+    title: 'Vacaciones canceladas',
+    body: `${who(r)} canceló sus vacaciones ${vacationDates(r)}${note}`,
+    url: '/tabs/dashboard',
+  });
+});
+
+exports.overtimeCancelled = onDocumentUpdated(`${OVERTIME}/{id}`, async (event) => {
+  const change = cancelledNow(event);
+  if (!change) return;
+  const { request: r, wasApproved } = change;
+  await send(await uidsWithRole(ADMIN_ROLES), {
+    tag: `${OVERTIME}-${event.params.id}-cancelada`,
+    title: 'Horas extra canceladas',
+    body: `${who(r)} canceló sus horas extra ${overtimeTime(r)}${wasApproved ? ' (estaban aprobadas).' : '.'}`,
+    url: '/tabs/dashboard',
+  });
+});
+
 exports.newNotice = onDocumentCreated(`${NOTICES}/{id}`, async (event) => {
   const n = event.data?.data();
   if (!n || typeof n.titulo !== 'string') return;
@@ -88,6 +119,16 @@ function decidedNow(event) {
   if (!before || !after || typeof after.uid !== 'string' || !after.uid) return null;
   if (before.estado === after.estado || !DECIDED.includes(after.estado)) return null;
   return after;
+}
+
+// The request after the change, only when the worker just cancelled a pending or approved one.
+function cancelledNow(event) {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!before || !after || after.estado !== 'cancelada') return null;
+  const was = before.estado || 'pendiente';
+  if (was !== 'pendiente' && was !== 'aprobada') return null;
+  return { request: after, wasApproved: was === 'aprobada' };
 }
 
 async function uidsWithRole(roles) {

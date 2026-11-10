@@ -26,12 +26,19 @@ export function vacationEvents(before: LastSeen, list: VacationRequest[], admin:
   const dates = (r: VacationRequest): string =>
     `del ${formatShortDate(r.start)} al ${formatShortDate(addDays(r.returnDate, -1))}`;
   if (admin) {
-    return added(before, list).map((r) => ({
+    const created = added(before, list).map((r) => ({
       tag: `${COLLECTIONS.vacations}-${r.id}-pendiente`,
       title: 'Nueva solicitud de vacaciones',
       body: `${r.employee} pide vacaciones ${dates(r)}.`,
       url: '/tabs/dashboard',
     }));
+    const dropped = cancelled(before, list).map(({ request: r, wasApproved }) => ({
+      tag: `${COLLECTIONS.vacations}-${r.id}-cancelada`,
+      title: 'Vacaciones canceladas',
+      body: `${r.employee} canceló sus vacaciones ${dates(r)}${wasApproved ? approvedNote(r.deductedDays) : '.'}`,
+      url: '/tabs/dashboard',
+    }));
+    return [...created, ...dropped];
   }
   return decided(before, list).map((r) => ({
     tag: `${COLLECTIONS.vacations}-${r.id}-${r.status}`,
@@ -45,12 +52,19 @@ export function overtimeEvents(before: LastSeen, list: OvertimeRequest[], admin:
   const when = (r: OvertimeRequest): string =>
     `el ${formatShortDate(r.start)}, ${formatTime(r.start)} – ${formatTime(r.end)}`;
   if (admin) {
-    return added(before, list).map((r) => ({
+    const created = added(before, list).map((r) => ({
       tag: `${COLLECTIONS.overtime}-${r.id}-pendiente`,
       title: 'Nueva solicitud de horas extra',
       body: `${r.employee} pide horas extra ${when(r)}.`,
       url: '/tabs/dashboard',
     }));
+    const dropped = cancelled(before, list).map(({ request: r, wasApproved }) => ({
+      tag: `${COLLECTIONS.overtime}-${r.id}-cancelada`,
+      title: 'Horas extra canceladas',
+      body: `${r.employee} canceló sus horas extra ${when(r)}${wasApproved ? ' (estaban aprobadas).' : '.'}`,
+      url: '/tabs/dashboard',
+    }));
+    return [...created, ...dropped];
   }
   return decided(before, list).map((r) => ({
     tag: `${COLLECTIONS.overtime}-${r.id}-${r.status}`,
@@ -73,6 +87,22 @@ export function noticeEvents(before: LastSeen, list: Notice[], admin: boolean): 
     }));
 }
 
+// Requests the worker cancelled since the last update, and whether they were already approved.
+function cancelled<T extends { id: string; status: RequestStatus }>(
+  before: LastSeen,
+  list: T[],
+): { request: T; wasApproved: boolean }[] {
+  if (!before) return [];
+  return list
+    .filter((r) => r.status === 'cancelada' && ['pendiente', 'aprobada'].includes(before.get(r.id) ?? ''))
+    .map((r) => ({ request: r, wasApproved: before.get(r.id) === 'aprobada' }));
+}
+
+function approvedNote(days: number | undefined): string {
+  if (!days) return ' (estaban aprobadas).';
+  return ` (estaban aprobadas; se le ${days === 1 ? 'devolvió 1 día' : `devolvieron ${days} días`}).`;
+}
+
 function added<T extends { id: string; status: RequestStatus }>(before: LastSeen, list: T[]): T[] {
   if (!before) return [];
   return list.filter((r) => !before.has(r.id) && r.status === 'pendiente');
@@ -80,5 +110,6 @@ function added<T extends { id: string; status: RequestStatus }>(before: LastSeen
 
 function decided<T extends { id: string; status: RequestStatus }>(before: LastSeen, list: T[]): T[] {
   if (!before) return [];
-  return list.filter((r) => r.status !== 'pendiente' && before.get(r.id) === 'pendiente');
+  // A cancellation is the worker's own action, so it does not notify.
+  return list.filter((r) => (r.status === 'aprobada' || r.status === 'rechazada') && before.get(r.id) === 'pendiente');
 }

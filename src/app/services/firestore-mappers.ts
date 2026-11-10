@@ -14,7 +14,7 @@ export const COLLECTIONS = {
   reports: 'weekly_reports',
 } as const;
 
-const STATUSES: readonly string[] = ['pendiente', 'aprobada', 'rechazada'];
+const STATUSES: readonly string[] = ['pendiente', 'aprobada', 'rechazada', 'cancelada'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
@@ -36,6 +36,7 @@ export function toVacationRequest(id: string, data: DocumentData): VacationReque
     rhReviewed: true,
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
+    deductedDays: deductedDays(data['decision']),
     comment: text(data['comentarioRRHH']) || undefined,
     sentAt: dateTime(data['fechaSolicitud']),
   };
@@ -100,6 +101,14 @@ export function sortBySent<T extends { sentAt?: string }>(list: T[]): T[] {
 function status(value: unknown): RequestStatus {
   const s = text(value);
   return STATUSES.includes(s) ? (s as RequestStatus) : 'pendiente';
+}
+
+function deductedDays(decision: unknown): number | undefined {
+  const days: unknown =
+    typeof decision === 'object' && decision !== null
+      ? (decision as Record<string, unknown>)['diasDescontados']
+      : undefined;
+  return typeof days === 'number' ? days : undefined;
 }
 
 function dateTime(value: unknown): string | undefined {

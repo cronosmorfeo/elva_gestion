@@ -26,6 +26,7 @@ describe('toVacationRequest', () => {
       rhReviewed: true,
       status: 'pendiente',
       ownerId: undefined,
+      deductedDays: undefined,
       comment: 'Viaje familiar',
       sentAt: '2026-11-09T10:55',
     });
@@ -36,6 +37,11 @@ describe('toVacationRequest', () => {
     expect(r?.status).toBe('aprobada');
     expect(r?.ownerId).toBe('u1');
     expect(toVacationRequest('abc', { ...vacation, estado: 'otra' })?.status).toBe('pendiente');
+  });
+
+  it('reads the days deducted at approval', () => {
+    const r = toVacationRequest('abc', { ...vacation, estado: 'aprobada', decision: { por: 'x', diasDescontados: 5 } });
+    expect(r?.deductedDays).toBe(5);
   });
 
   it('uses the email when there is no name', () => {

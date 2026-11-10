@@ -20,10 +20,12 @@ const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', '
 })
 export class VacationRequestPage implements OnInit {
   private readonly toast = inject(ToastController);
-  private readonly store = inject(RequestsStore);
+  readonly store = inject(RequestsStore);
   private readonly router = inject(Router);
 
-  readonly availableDays = signal(12); 
+  // Live from Firestore: saved balance minus the requests still pending (see RequestsStore).
+  readonly hasBalance = computed(() => this.store.myAvailableDays() !== null);
+  readonly availableDays = computed(() => this.store.myAvailableDays() ?? 0);
   readonly userEmail = signal<string | null>(null);
   readonly userName = signal<string>('Andrey Rojas'); // Para almacenar el nombre del colaborador
 
@@ -60,6 +62,7 @@ export class VacationRequestPage implements OnInit {
     if (this.end() === this.start()) return 'La fecha de reincorporación debe ser posterior al primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';
     if (this.deducted() === 0) return 'Las fechas elegidas no incluyen días laborales.';
+    if (!this.hasBalance()) return 'Todavía no tiene días de vacaciones registrados. Consulte con RH.';
     if (this.remaining() < 0) return `Solo tiene ${this.availableDays()} días disponibles.`;
     return '';
   });
@@ -97,14 +100,6 @@ export class VacationRequestPage implements OnInit {
             this.userEmail.set(colaboradorData['correo']);
           }
 
-          // Extraer vacaciones disponibles directamente de Firestore
-          if (typeof colaboradorData['vacaciones_disponibles'] === 'number') {
-            const dias = colaboradorData['vacaciones_disponibles'];
-            console.log(`[VacationRequest] Vacaciones disponibles encontradas: ${dias}`);
-            this.availableDays.set(dias);
-          } else {
-            console.warn('[VacationRequest] El campo "vacaciones_disponibles" no es un número válido en Firestore.');
-          }
         } else {
           console.warn(`[VacationRequest] No se encontró ningún documento en la colección 'colaboradores' con el ID: ${uid}`);
         }

@@ -21,7 +21,14 @@ ion-tabs {
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
+  color: inherit;
   font-weight: 800;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid #5ce1e6;
+    outline-offset: 2px;
+  }
 
   img {
     width: 28px;

@@ -4,7 +4,8 @@ import { countDeductedDays, listVacationDays } from '../vacation-request/vacatio
 
 import { addDays } from './admin-dates';
 
-export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada';
+// 'cancelada': the worker cancelled it while it was pending. It is kept for the history.
+export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada';
 
 export interface VacationRequest {
   id: string;
@@ -17,6 +18,7 @@ export interface VacationRequest {
   // Set when a worker sends the request from the app.
   ownerId?: string;
   email?: string;
+  deductedDays?: number; // days taken from the balance when it was approved (returned if cancelled)
   comment?: string;
   sentAt?: string; // YYYY-MM-DDTHH:mm
   sample?: boolean;

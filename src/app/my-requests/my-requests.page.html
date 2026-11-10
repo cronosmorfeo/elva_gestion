@@ -22,7 +22,16 @@
       </button>
     </div>
 
-    @if (loading()) {
+    @if (!loading() && months().length > 1) {
+    <label class="field month-field">
+      <span>Mes</span>
+      <select [value]="month()" (change)="setMonth($event)">
+        @for (m of months(); track m.value) {
+        <option [value]="m.value" [selected]="m.value === month()">{{ m.label }}</option>
+        }
+      </select>
+    </label>
+    } @if (loading()) {
     <p class="note">Cargando…</p>
     } @else {
     <ul class="request-list">
@@ -37,6 +46,19 @@
         <p class="request-note">{{ r.note }}</p>
         }
         <span class="meta">{{ r.sent }}{{ r.sample ? ' · Ejemplo' : '' }}</span>
+        @if (r.cancellable) { @if (confirmCancelId() === r.id) {
+        <div class="cancel-confirm" role="alert">
+          <span>{{ r.confirmText }}</span>
+          <div class="cancel-actions">
+            <button type="button" class="cancel-no" (click)="keepRequest()" [disabled]="cancelling()">No</button>
+            <button type="button" class="cancel-yes" (click)="cancelRequest(r.id)" [disabled]="cancelling()">
+              Sí, cancelar
+            </button>
+          </div>
+        </div>
+        } @else {
+        <button type="button" class="cancel-link" (click)="askCancel(r.id)">Cancelar solicitud</button>
+        } }
       </li>
       } @empty {
       <li class="card empty">
@@ -48,7 +70,5 @@
       }
     </ul>
     }
-
-    <p class="note">Por ahora las solicitudes se borran al recargar la página: falta guardarlas en la base de datos.</p>
   </div>
 </ion-content>

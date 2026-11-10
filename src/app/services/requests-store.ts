@@ -9,6 +9,7 @@ import {
   getFirestore,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
@@ -16,6 +17,7 @@ import {
 } from 'firebase/firestore';
 
 import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
+import { vacationDays } from '../admin-dashboard/admin-requests';
 import type { Notice, NoticeInput } from '../notices/notice-utils';
 import { localDateTime, sortNotices, unseenNotices } from '../notices/notice-utils';
 import type { ReportFile, WorkReport } from '../reports/report-utils';
@@ -33,6 +35,8 @@ import {
 import type { BrowserNotice, LastSeen } from './notification-events';
 import { lastSeen, noticeEvents, overtimeEvents, vacationEvents } from './notification-events';
 import { NotificationsService } from './notifications';
+import type { ApproveResult, CancelResult } from './vacation-balance';
+import { ApproveError, availableDays, canCancel, checkBalance } from './vacation-balance';
 
 // Requests, notices and reports from Firestore, shared by the worker pages and the dashboard.
 // The lists update live: a new request or a decision shows up without reloading.
@@ -46,6 +50,15 @@ export class RequestsStore {
   readonly notices = signal<Notice[]>([]);
   readonly reports = signal<WorkReport[]>([]);
   readonly loadError = signal(false);
+  // The signed-in person's vacation balance (colaboradores.vacaciones_disponibles), live. null = not on record.
+  readonly myBalance = signal<number | null>(null);
+  readonly myUid = signal('');
+  readonly myPendingVacationDays = computed(() =>
+    this.vacations()
+      .filter((r) => r.ownerId === this.myUid() && r.status === 'pendiente')
+      .reduce((sum, r) => sum + vacationDays(r), 0),
+  );
+  readonly myAvailableDays = computed(() => availableDays(this.myBalance(), this.myPendingVacationDays()));
   readonly sortedNotices = computed(() => sortNotices(this.notices()));
   readonly noticesSeenAt = signal('');
   readonly unseenNotices = computed(() => unseenNotices(this.notices(), this.noticesSeenAt()));
@@ -68,6 +81,7 @@ export class RequestsStore {
     this.stopWatching();
     this.watching = key;
     this.uid = uid;
+    this.myUid.set(uid);
     this.noticesSeenAt.set(readSeen(uid));
     const db = getFirestore();
     const scoped = (name: string): Query =>
@@ -89,6 +103,15 @@ export class RequestsStore {
       overtimeSeen = lastSeen(list);
     });
     this.listen(scoped(COLLECTIONS.reports), (s) => this.reports.set(sortBySent(mapDocs(s, toWorkReport))));
+    const stopBalance = onSnapshot(
+      doc(db, 'colaboradores', uid),
+      (snap) => {
+        const balance: unknown = snap.data()?.['vacaciones_disponibles'];
+        this.myBalance.set(typeof balance === 'number' ? balance : null);
+      },
+      (err) => console.error('[RequestsStore] Could not read the vacation balance:', err),
+    );
+    this.stops.push(stopBalance);
     this.listen(collection(db, COLLECTIONS.notices), (s) => {
       const list = mapDocs(s, toNotice);
       this.notices.set(list);
@@ -101,6 +124,8 @@ export class RequestsStore {
     this.worker = null;
     this.stopWatching();
     this.uid = '';
+    this.myUid.set('');
+    this.myBalance.set(null);
     this.vacations.set([]);
     this.overtime.set([]);
     this.notices.set([]);
@@ -125,6 +150,71 @@ export class RequestsStore {
 
   decideVacation(id: string, status: RequestStatus): Promise<void> {
     return this.decide(COLLECTIONS.vacations, id, status);
+  }
+
+  // Approves and deducts the days from colaboradores/{uid}.vacaciones_disponibles in one transaction:
+  // both are saved or neither is, and two admins approving at once only deduct once.
+  async approveVacation(id: string, ownerUid: string | undefined, days: number): Promise<ApproveResult> {
+    const db = getFirestore();
+    const requestRef = doc(db, COLLECTIONS.vacations, id);
+    return runTransaction(db, async (tx) => {
+      const request = await tx.get(requestRef);
+      if (!request.exists()) throw new ApproveError('no-existe');
+      const estado: unknown = request.data()['estado'];
+      if (estado === 'cancelada') throw new ApproveError('cancelada');
+      if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
+      const ownerRef = ownerUid ? doc(db, 'colaboradores', ownerUid) : null;
+      const owner = ownerRef ? await tx.get(ownerRef) : null;
+      const check = checkBalance(owner?.data()?.['vacaciones_disponibles'], days);
+      if (check.kind === 'insuficiente') throw new ApproveError('insuficiente', check.balance);
+      if (ownerRef && check.kind === 'descontar') tx.update(ownerRef, { vacaciones_disponibles: check.next });
+      const deducted = check.kind === 'descontar' ? days : 0;
+      tx.update(requestRef, {
+        estado: 'aprobada',
+        decision: { por: this.uid, fecha: serverTimestamp(), diasDescontados: deducted },
+      });
+      return check.kind === 'descontar' ? { kind: 'descontado', next: check.next } : { kind: 'sin-saldo' };
+    });
+  }
+
+  // The worker cancels a pending or approved request that has not started. It stays saved, marked as
+  // cancelada. If approved vacations had days deducted, the same days go back to the balance.
+  // All in one transaction, so a decision made a moment before is not overwritten and the days return once.
+  async cancelRequest(kind: 'vacaciones' | 'horas', id: string): Promise<CancelResult> {
+    const db = getFirestore();
+    const ref = doc(db, kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id);
+    const now = localDateTime(new Date());
+    return runTransaction(db, async (tx): Promise<CancelResult> => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return { kind: 'ya-decidida' };
+      const data = snap.data();
+      const estado = typeof data['estado'] === 'string' ? data['estado'] : 'pendiente';
+      const start = String(data[kind === 'vacaciones' ? 'diaInicio' : 'inicio'] ?? '');
+      const check = canCancel(estado, start, now);
+      if (check !== 'si') return { kind: check };
+      const wasApproved = estado === 'aprobada';
+      const decision: unknown = data['decision'];
+      const deducted =
+        wasApproved && kind === 'vacaciones' && typeof decision === 'object' && decision !== null
+          ? (decision as Record<string, unknown>)['diasDescontados']
+          : 0;
+      const days = typeof deducted === 'number' && deducted > 0 ? deducted : 0;
+      const ownerRef = days && typeof data['uid'] === 'string' ? doc(db, 'colaboradores', data['uid']) : null;
+      const owner = ownerRef ? await tx.get(ownerRef) : null;
+      const balance: unknown = owner?.data()?.['vacaciones_disponibles'];
+      const returnedDays = ownerRef && typeof balance === 'number' ? days : 0;
+      if (ownerRef && returnedDays) tx.update(ownerRef, { vacaciones_disponibles: (balance as number) + returnedDays });
+      tx.update(ref, {
+        estado: 'cancelada',
+        cancelacion: {
+          por: this.uid,
+          fecha: serverTimestamp(),
+          estabaAprobada: wasApproved,
+          diasDevueltos: returnedDays,
+        },
+      });
+      return { kind: 'cancelada', returnedDays, wasApproved };
+    });
   }
 
   decideOvertime(id: string, status: RequestStatus): Promise<void> {

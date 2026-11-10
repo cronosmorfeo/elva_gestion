@@ -10,6 +10,8 @@ import { fileKind, formatFileSize, unseenCount, weekLabel } from '../reports/rep
 import { AuthService } from '../services/auth';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
+import type { ApproveResult } from '../services/vacation-balance';
+import { ApproveError, approveProblemText } from '../services/vacation-balance';
 import {
   currencySymbol,
   formatCedula,
@@ -84,6 +86,7 @@ interface EditForm {
   jornada: string;
   horaInicio: string;
   horaFin: string;
+  vacaciones: string; // vacation balance as typed; '' = not on record
   activo: boolean;
   cedula: string;
   iban: string;
@@ -141,6 +144,7 @@ const STATUS_TABS: { id: RequestStatus; label: string }[] = [
   { id: 'pendiente', label: 'Pendientes' },
   { id: 'aprobada', label: 'Aprobadas' },
   { id: 'rechazada', label: 'Rechazadas' },
+  { id: 'cancelada', label: 'Canceladas' },
 ];
 
 function roleLabel(tipo: unknown): string {
@@ -371,6 +375,13 @@ export class AdminDashboardPage {
     if (!f.moneda) missing.push('moneda');
     if (!f.jornada) missing.push('jornada');
     if (!scheduleText(f.horaInicio, f.horaFin)) missing.push('horario');
+    const hadBalance = (JSON.parse(this.editOriginal() || '{}') as Partial<EditForm>).vacaciones;
+    const vacationError =
+      f.vacaciones === ''
+        ? hadBalance
+          ? 'Escribí los días de vacaciones (puede ser 0).'
+          : ''
+        : vacationProblem(f.vacaciones);
     const changed = JSON.stringify(f) !== this.editOriginal();
     return {
       symbol: currencySymbol(f.moneda),
@@ -380,7 +391,8 @@ export class AdminDashboardPage {
       ibanComplete: normalizeIban(f.iban).length >= 22,
       ibanValid: isValidCrIban(f.iban),
       missing: missing.length ? `Falta: ${missing.join(', ')}.` : '',
-      canSave: missing.length === 0 && changed && !this.editSaving(),
+      vacationError,
+      canSave: missing.length === 0 && !vacationError && changed && !this.editSaving(),
       changed,
     };
   });
@@ -411,8 +423,37 @@ export class AdminDashboardPage {
   async decideVacation(id: string, status: RequestStatus): Promise<void> {
     const request = this.vacations().find((r) => r.id === id);
     if (!request) return;
-    if (!(await this.saved(this.store.decideVacation(id, status)))) return;
-    await this.logDecision(`las vacaciones de ${request.employee}`, status);
+    if (status === 'rechazada') {
+      if (!(await this.saved(this.store.decideVacation(id, status)))) return;
+      await this.logDecision(`las vacaciones de ${request.employee}`, status);
+      return;
+    }
+    const owner = ownerOf(request, this.employees());
+    const days = vacationDays(request);
+    let result: ApproveResult;
+    try {
+      result = await this.store.approveVacation(id, owner?.id, days);
+    } catch (err) {
+      const message =
+        err instanceof ApproveError
+          ? approveProblemText(err.problem, request.employee, err.balance)
+          : 'No se pudo guardar. Revisá la conexión e intentá de nuevo.';
+      if (!(err instanceof ApproveError)) console.error('[AdminDashboard] Could not approve the vacation:', err);
+      const toast = await this.toast.create({ message, duration: 5000, position: 'bottom' });
+      await toast.present();
+      return;
+    }
+    if (result.kind === 'descontado' && owner) {
+      this.employees.update((list) =>
+        list.map((e) => (e.id === owner.id ? { ...e, vacationBalance: result.next } : e)),
+      );
+    }
+    await this.log(
+      `${this.profileName() || 'Vos'} aprobó las vacaciones de ${request.employee}`,
+      result.kind === 'descontado'
+        ? `Aprobada. Se descontaron ${dayCount(days)}; a ${request.employee} le quedan ${dayCount(result.next)}.`
+        : `Aprobada. ${request.employee} no tiene saldo registrado, así que no se descontaron días.`,
+    );
   }
 
   async decideOvertime(id: string, status: RequestStatus): Promise<void> {
@@ -573,6 +614,7 @@ export class AdminDashboardPage {
       jornada: e.jornada,
       horaInicio: times?.start ?? '',
       horaFin: times?.end ?? '',
+      vacaciones: e.vacationBalance === null ? '' : String(e.vacationBalance),
       activo: e.active,
       cedula: payee?.cedula ?? '',
       iban: payee ? groupIban(payee.iban) : '',
@@ -593,6 +635,13 @@ export class AdminDashboardPage {
   setEditField(field: EditField, event: Event): void {
     const value = (event.target as HTMLInputElement | HTMLSelectElement).value;
     this.editing.update((f) => (f ? { ...f, [field]: value } : f));
+  }
+
+  setEditVacation(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const vacaciones = input.value.replace(/\D/g, '').slice(0, 3);
+    input.value = vacaciones;
+    this.editing.update((f) => (f ? { ...f, vacaciones } : f));
   }
 
   setEditActive(event: Event): void {
@@ -644,6 +693,8 @@ export class AdminDashboardPage {
       jornada: f.jornada,
       horarioLaborado: horario,
       activo: f.activo,
+      // Only saved when it has a value, so employees without a balance stay that way.
+      ...(f.vacaciones === '' ? {} : { vacaciones_disponibles: Number(f.vacaciones) }),
     };
     this.editSaving.set(true);
     this.editError.set('');
@@ -669,6 +720,7 @@ export class AdminDashboardPage {
                 salario: changes.salario,
                 moneda: changes.moneda,
                 pais: changes.pais,
+                vacationBalance: f.vacaciones === '' ? e.vacationBalance : Number(f.vacaciones),
               }
             : e,
         ),
@@ -816,17 +868,27 @@ export class AdminDashboardPage {
 }
 
 function countByStatus(list: { status: RequestStatus }[]): Record<RequestStatus, number> {
-  const counts: Record<RequestStatus, number> = { pendiente: 0, aprobada: 0, rechazada: 0 };
+  const counts: Record<RequestStatus, number> = { pendiente: 0, aprobada: 0, rechazada: 0, cancelada: 0 };
   for (const r of list) counts[r.status]++;
   return counts;
 }
 
 // Requests from Firestore do not carry the balance; it comes from the employee, found by email.
 function balanceText(request: VacationRequest, employees: Employee[]): string {
-  const balance = Number.isFinite(request.balance)
-    ? request.balance
-    : employees.find((e) => e.email && e.email === request.email)?.vacationBalance;
+  const balance = Number.isFinite(request.balance) ? request.balance : ownerOf(request, employees)?.vacationBalance;
   return typeof balance === 'number' ? dayCount(balance) : 'sin dato';
+}
+
+// The real employee who sent a request: by uid, or by email for requests sent before the uid was saved.
+function ownerOf(request: VacationRequest, employees: Employee[]): Employee | undefined {
+  const real = employees.filter((e) => !e.sample);
+  return real.find((e) => e.id === request.ownerId) ?? real.find((e) => !!e.email && e.email === request.email);
+}
+
+// Whole days, from 0 to 365. '' means it was left empty.
+function vacationProblem(value: string): string {
+  if (!/^\d{1,3}$/.test(value)) return 'Escribí solo números enteros.';
+  return Number(value) > 365 ? 'No puede ser más de 365 días.' : '';
 }
 
 function dayCount(n: number): string {

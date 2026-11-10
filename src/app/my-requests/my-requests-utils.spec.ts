@@ -1,6 +1,17 @@
 import type { OvertimeRequest, VacationRequest } from '../admin-dashboard/admin-requests';
 
-import { exampleRequests, overtimeRows, statusText, vacationRows } from './my-requests-utils';
+import type { RequestRow } from './my-requests-utils';
+import {
+  ALL_MONTHS,
+  defaultMonth,
+  exampleRequests,
+  inMonth,
+  monthLabel,
+  monthOptions,
+  overtimeRows,
+  statusText,
+  vacationRows,
+} from './my-requests-utils';
 
 const vacation = (id: string, ownerId: string, sentAt: string): VacationRequest => ({
   id,
@@ -20,6 +31,7 @@ describe('my requests', () => {
     expect(statusText('pendiente', true)).toBe('Pendiente');
     expect(statusText('aprobada', true)).toBe('Aprobada');
     expect(statusText('rechazada', true)).toBe('Rechazada');
+    expect(statusText('cancelada', true)).toBe('Cancelada');
   });
 
   it('shows only my vacations, newest first', () => {
@@ -59,5 +71,48 @@ describe('my requests', () => {
     expect(ex.vacations.every((v) => v.ownerId === 'u1' && v.sample === true)).toBe(true);
     expect(vacationRows(ex.vacations, 'u1')).toHaveLength(2);
     expect(overtimeRows(ex.overtime, 'u1').map((r) => r.status)).toEqual(['rechazada', 'aprobada']);
+  });
+});
+
+const row = (id: string, month: string, status: RequestRow['status']): RequestRow => ({
+  id,
+  title: '',
+  detail: '',
+  note: '',
+  sent: '',
+  status,
+  statusText: '',
+  sample: false,
+  month,
+  start: `${month}-15`,
+  returnDays: 0,
+});
+
+describe('month filter', () => {
+  const rows = [row('a', '2026-11', 'aprobada'), row('b', '2026-12', 'pendiente'), row('c', '2026-11', 'pendiente')];
+
+  it('lists the months with requests, newest first, plus all months', () => {
+    expect(monthOptions(rows)).toEqual([
+      { value: '2026-12', label: 'Diciembre 2026 · 1 solicitud · 1 pendiente' },
+      { value: '2026-11', label: 'Noviembre 2026 · 2 solicitudes · 1 pendiente' },
+      { value: ALL_MONTHS, label: 'Todos los meses' },
+    ]);
+  });
+
+  it('opens on the current month when it has requests, otherwise the newest', () => {
+    const options = monthOptions(rows);
+    expect(defaultMonth(options, '2026-11-10')).toBe('2026-11');
+    expect(defaultMonth(options, '2027-02-01')).toBe('2026-12');
+    expect(defaultMonth(monthOptions([]), '2026-11-10')).toBe(ALL_MONTHS);
+  });
+
+  it('filters by month', () => {
+    expect(inMonth(rows, '2026-11').map((r) => r.id)).toEqual(['a', 'c']);
+    expect(inMonth(rows, ALL_MONTHS)).toHaveLength(3);
+  });
+
+  it('uses the vacation date for the month', () => {
+    expect(vacationRows([vacation('a', 'me', '2026-10-30T08:00')], 'me')[0].month).toBe('2026-11');
+    expect(monthLabel('2026-01')).toBe('Enero 2026');
   });
 });

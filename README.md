@@ -6,14 +6,15 @@ Internal Human Resources app for ELVA IA. Employees submit requests (vacation an
 
 | Section | Route | What it does |
 | --- | --- | --- |
-| Navbar | Top of the worker pages | Shown only after sign-in. Links to Vacaciones, Horas extra, Mi reporte, Mis solicitudes and Avisos (with the number of new notices), "Panel de administración" for admin/HR, and "Cerrar sesión". Hidden on login, the dashboard and Tab 3, which have their own header. |
-| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. Signed-in users only. The balance comes from `colaboradores.vacaciones_disponibles`. Requests are saved in Firestore (`vacations_requests`) and show up in Mis solicitudes and in the dashboard. |
+| Navbar | Top of the worker pages | Shown only after sign-in. Links to Inicio (also the ELVA logo), Vacaciones, Horas extra, Mi reporte, Mis solicitudes and Avisos (with the number of new notices), "Panel de administración" for admin/HR, and "Cerrar sesión". Hidden on login, the dashboard and Tab 3, which have their own header. |
+| Home | `/tabs/inicio` | Signed-in users only. First page for workers after sign-in: greeting, available vacation days, pending requests, new notices and this week's report, plus "Próximamente" (approved vacations and overtime, and the next holidays). Each card links to its page. |
+| Vacation request | `/tabs/vacaciones` | Pick a date range and see the deducted days, remaining balance and a day-by-day breakdown. Signed-in users only. Available days are the balance in `colaboradores.vacaciones_disponibles` (read live) minus the days of pending requests; it never shows below 0. Requests are saved in Firestore (`vacations_requests`) and show up in Mis solicitudes and in the dashboard. |
 | Overtime request | `/tabs/horas-extra` | Pick a start and end (it can cross midnight), describe the work and see the hours per day with their pay rate. Signed-in users only. Requests are saved in Firestore (`overtime_requests`) and show up in Mis solicitudes and in the dashboard. |
-| Admin dashboard | `/tabs/dashboard` | Admin and HR only. Fixed side menu, today's date, request summary, vacation and overtime approvals, pending payments, real employee list and upcoming holidays. Edit an employee's data and read each employee's weekly reports (mark them as seen). Approve or reject requests and manage notices. Requests, notices and reports are read from Firestore and update live (`RequestsStore`); payments are still sample data. |
-| My requests | `/tabs/solicitudes` | Signed-in users only. The worker's own vacation and overtime requests (filter by type) with their status: pending, approved or rejected. |
+| Admin dashboard | `/tabs/dashboard` | Admin and HR only. Fixed side menu, today's date, request summary, vacation and overtime approvals, pending payments, real employee list and upcoming holidays. Edit an employee's data and read each employee's weekly reports (mark them as seen). Approve or reject requests (approving vacations deducts the days from the balance and is blocked if they are not enough) and manage notices. Tabs: pending, approved, rejected and cancelled. Edit employee also sets the vacation balance. Requests, notices and reports are read from Firestore and update live (`RequestsStore`); payments are still sample data. |
+| My requests | `/tabs/solicitudes` | Signed-in users only. The worker's own vacation and overtime requests (filter by type and month) with their status: pending, approved, rejected or cancelled. Pending or approved requests that have not started can be cancelled: approved vacation days go back to the balance and admins are notified. |
 | Notices | `/tabs/avisos` | Signed-in users only. Notices published by admin/HR, important ones on top. Admins create, edit and delete them in the dashboard. |
 | Weekly report | `/tabs/reporte` | Signed-in workers only. Optional: pick the week, write what they did and/or attach any files. Reports are saved in Firestore (`weekly_reports`); attached files are not uploaded yet, only their names are saved (Storage needs the Blaze plan). |
-| Login (Tab 1) | `/tabs/login` | Sign-in with Firebase Authentication. Workers go to Vacaciones; admin/HR go to the dashboard. |
+| Login (Tab 1) | `/tabs/login` | Sign-in with Firebase Authentication. Workers go to Inicio; admin/HR go to the dashboard. |
 | Push test (Tab 2) | `/tabs/tab2` | **Temporary** page to test push notifications with an anonymous user. To be replaced once the login is connected. |
 | Users (Tab 3) | `/tabs/tab3` | Admin panel to create employees in Firebase Authentication and Firestore. |
 
@@ -104,6 +105,7 @@ src/
 └── app/
     ├── app.routes.ts              # Main routes
     ├── tabs/                      # Tab bar, navbar and their routes
+    ├── home/                      # Home page (Inicio) for workers
     ├── auth/                      # Sign-in guard (not connected yet)
     ├── vacation-request/          # Vacation request page and Costa Rica holidays
     ├── overtime-request/          # Overtime request page
@@ -119,6 +121,7 @@ src/
         ├── requests-store.ts          # Live Firestore data: requests, notices, reports
         ├── firestore-mappers.ts       # Firestore documents -> page types
         ├── notification-events.ts     # What to notify, and to whom
+        ├── vacation-balance.ts        # Vacation balance and cancel rules
         ├── notifications.ts           # Shows cards and system notifications
         └── push-notification.service.ts
 functions/                         # Cloud Functions for push with the page closed (not deployed)
@@ -128,7 +131,7 @@ functions/                         # Cloud Functions for push with the page clos
 
 | Who | When |
 | --- | --- |
-| Admin/HR | A worker sends a vacation or overtime request. |
+| Admin/HR | A worker sends or cancels a vacation or overtime request. |
 | Worker | One of their requests is approved or rejected, or a new notice is published. |
 
 Weekly reports do not notify; admins read them in the dashboard.
@@ -145,6 +148,8 @@ Both ways use the same notification tag, so the browser shows only one. The serv
 
 - Weekends and mandatory Costa Rica holidays are not deducted. Optional holidays (Aug 2, Aug 31, Dec 1) are deducted, pending HR confirmation.
 - Holidays are calculated for any year, including Holy Thursday and Good Friday. Holidays moved by law go in `MOVED_HOLIDAYS` in `holidays.ts`.
+- The balance is set by admins in Edit employee. How days are earned (for example, per month worked) is still to be defined with HR, so for now admins add them by hand.
+- Approving deducts the days; cancelling an approved vacation that has not started returns them. Employees without a balance on record cannot request vacations until an admin sets it.
 
 ## Overtime hours
 
@@ -157,14 +162,16 @@ Both ways use the same notification tag, so the browser shows only one. The serv
 
 | Collection | What it stores | Written by |
 | --- | --- | --- |
-| `colaboradores/{uid}` | Name, country, salary, currency, start date, work schedule and email. | Users panel (Tab 3). |
-| `vacations_requests/{id}` | Vacation request: `uid`, `nombreSolicitante`, `correoSolicitante`, `diaInicio`, `diaFin` (return day), `diasSolicitados`, `comentarioRRHH`, `fechaSolicitud`, `estado`, `decision`. | Worker (vacation page); admin/HR set `estado` and `decision`. |
-| `overtime_requests/{id}` | Overtime request: `uid`, `nombreSolicitante`, `correoSolicitante`, `inicio`, `fin`, `tarea`, `estado`, `fechaSolicitud`, `decision`. | Worker (overtime page); admin/HR decide. |
+| `colaboradores/{uid}` | Name, country, salary, currency, start date, work schedule, email and `vacaciones_disponibles` (vacation balance, whole days). | Users panel (Tab 3) and Edit employee. The balance also changes when a vacation is approved or cancelled. |
+| `vacations_requests/{id}` | Vacation request: `uid`, `nombreSolicitante`, `correoSolicitante`, `diaInicio`, `diaFin` (return day), `diasSolicitados`, `comentarioRRHH`, `fechaSolicitud`, `estado`, `decision`, `cancelacion`. | Worker (vacation page, and cancelling); admin/HR set `estado` and `decision`. |
+| `overtime_requests/{id}` | Overtime request: `uid`, `nombreSolicitante`, `correoSolicitante`, `inicio`, `fin`, `tarea`, `estado`, `fechaSolicitud`, `decision`, `cancelacion`. | Worker (overtime page, and cancelling); admin/HR decide. |
 | `notices/{id}` | Notice: `titulo`, `mensaje`, `importante`, `autor`, `autorUid`, `createdAt`, `updatedAt`. | Admin/HR (dashboard). |
 | `weekly_reports/{id}` | Weekly report: `uid`, `nombre`, `semana` (Monday), `texto`, `archivos` (name, size, type), `visto`, `fechaEnvio`. | Worker; admin/HR set `visto`. |
 | `users/{uid}/fcmTokens/{token}` | Notification token per browser (`createdAt`, `userAgent`). | `PushNotificationService`. |
 
-`estado` is `pendiente`, `aprobada` or `rechazada` (missing means pending). `decision` and `visto` are `{ por: uid, fecha }`.
+`estado` is `pendiente`, `aprobada`, `rechazada` or `cancelada` (missing means pending). `decision` and `visto` are `{ por: uid, fecha }`; an approved vacation's `decision` also has `diasDescontados`. `cancelacion` is `{ por, fecha, estabaAprobada, diasDevueltos }`.
+
+Approving a vacation and cancelling a request run in Firestore transactions, so the balance changes exactly once even if two people act at the same time.
 
 ## Security
 
@@ -173,6 +180,7 @@ Both ways use the same notification tag, so the browser shows only one. The serv
 - **Sign-in:** the navbar and the worker pages need a session (`authGuard`).
 - **Admin dashboard:** `adminGuard` only lets in users whose `tipo_colaborador` is `admin` or `rh`. It hides the page in the app, but the Firestore rules must also restrict `colaboradores` and the requests to those roles.
 - **Requests and notices:** a worker may read only their own requests; only admin/HR may decide requests and write notices; every signed-in user may read notices. The app already asks only for the worker's own documents (`where uid == me`), but only the Firestore rules can enforce it.
+- **Vacation balance:** today the worker's browser returns the days to their own balance when cancelling. The Firestore rules (or a Cloud Function) must only allow returning the `diasDescontados` of that request, and only admin/HR may change the balance otherwise.
 - **Weekly reports:** only the worker who sent a report and admin/HR may read it, never coworkers. The Firestore rules (`weekly_reports`), and the Storage rules once files are uploaded, must enforce that.
 - **Anonymous sign-in:** disable it in Firebase once the push test page is removed.
 - **Notifications:** notification text must not include sensitive data, because it shows on the lock screen. The rules must let each user write only their own tokens in `users/{uid}/fcmTokens`.

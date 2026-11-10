@@ -49,6 +49,22 @@ describe('vacationEvents', () => {
     ]);
   });
 
+  it('tells admins, not the worker, about cancellations', () => {
+    expect(vacationEvents(lastSeen([vac('a', 'pendiente')]), [vac('a', 'cancelada')], false)).toEqual([]);
+    const approved = { ...vac('a', 'cancelada'), deductedDays: 5 };
+    expect(vacationEvents(lastSeen([vac('a', 'aprobada')]), [approved], true)).toEqual([
+      {
+        tag: 'vacations_requests-a-cancelada',
+        title: 'Vacaciones canceladas',
+        body: 'Ana Solís canceló sus vacaciones del lun 23 nov al dom 29 nov (estaban aprobadas; se le devolvieron 5 días).',
+        url: '/tabs/dashboard',
+      },
+    ]);
+    expect(vacationEvents(lastSeen([vac('a', 'pendiente')]), [vac('a', 'cancelada')], true)[0].body).toBe(
+      'Ana Solís canceló sus vacaciones del lun 23 nov al dom 29 nov.',
+    );
+  });
+
   it('does not tell the worker about their own new request', () => {
     expect(vacationEvents(lastSeen([]), [vac('a', 'pendiente')], false)).toEqual([]);
   });

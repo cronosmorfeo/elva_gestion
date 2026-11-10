@@ -88,7 +88,6 @@
           <section id="vacaciones" class="card" aria-labelledby="t-vac">
             <div class="card-head">
               <h2 id="t-vac">Aprobar vacaciones</h2>
-              <span class="sample">Datos de ejemplo</span>
               <div class="tabs" role="group" aria-label="Filtrar vacaciones">
                 @for (tab of statusTabs; track tab.id) {
                 <button
@@ -161,7 +160,6 @@
           <section id="horas-extra" class="card" aria-labelledby="t-he">
             <div class="card-head">
               <h2 id="t-he">Horas extra por aprobar</h2>
-              <span class="sample">Datos de ejemplo</span>
               <div class="tabs" role="group" aria-label="Filtrar horas extra">
                 @for (tab of statusTabs; track tab.id) {
                 <button
@@ -738,6 +736,31 @@
           </div>
           @if (editState()?.schedule) {
           <span class="muted">{{ editState()?.schedule }} · {{ editState()?.hours }}</span>
+          }
+        </div>
+      </div>
+
+      <h3 class="edit-section">Vacaciones</h3>
+      <div class="edit-grid">
+        <div class="edit-field">
+          <label for="edit-vacaciones">Días de vacaciones disponibles</label>
+          <input
+            id="edit-vacaciones"
+            type="text"
+            inputmode="numeric"
+            placeholder="Ej. 12"
+            [attr.maxlength]="3"
+            [attr.aria-invalid]="!!editState()?.vacationError"
+            [value]="f.vacaciones"
+            (input)="setEditVacation($event)"
+          />
+          @if (editState()?.vacationError) {
+          <span class="error-text">{{ editState()?.vacationError }}</span>
+          } @else {
+          <span class="muted"
+            >Se resta solo al aprobar vacaciones y se devuelve si el trabajador las cancela. Usalo para el saldo inicial
+            o para sumar los días que va ganando.</span
+          >
           }
         </div>
       </div>

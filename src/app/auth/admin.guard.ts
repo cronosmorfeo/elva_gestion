@@ -25,7 +25,7 @@ export const adminGuard: CanActivateFn = async () => {
     const snap = await getDoc(doc(getFirestore(), 'colaboradores', user!.uid));
     const data = snap.data();
     if (data?.['activo'] === true && isAdminRole(data['tipo_colaborador'])) return true;
-    return router.parseUrl('/tabs/vacaciones');
+    return router.parseUrl('/tabs/inicio');
   } catch {
     return router.parseUrl('/tabs/login');
   }

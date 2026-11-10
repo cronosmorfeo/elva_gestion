@@ -2,11 +2,12 @@
 <ion-header>
   <ion-toolbar class="navbar">
     <nav class="navbar-content" aria-label="Menú principal">
-      <span class="brand">
+      <a class="brand" routerLink="/tabs/inicio" aria-label="Inicio">
         <img src="assets/icon/logo.png" alt="" />
         <span class="brand-name">ELVA Gestión</span>
-      </span>
+      </a>
       <div class="links">
+        <a routerLink="/tabs/inicio" routerLinkActive="active" ariaCurrentWhenActive="page">Inicio</a>
         <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
         <a routerLink="/tabs/horas-extra" routerLinkActive="active" ariaCurrentWhenActive="page">Horas extra</a>
         <a routerLink="/tabs/reporte" routerLinkActive="active" ariaCurrentWhenActive="page">Mi reporte</a>

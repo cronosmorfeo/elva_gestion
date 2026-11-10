@@ -23,6 +23,11 @@ export const routes: Routes = [
         loadComponent: () => import('../tab3/tab3.page').then((m) => m.Tab3Page),
       },
       {
+        path: 'inicio',
+        canActivate: [authGuard],
+        loadComponent: () => import('../home/home.page').then((m) => m.HomePage),
+      },
+      {
         path: 'vacaciones',
         canActivate: [authGuard],
         loadComponent: () => import('../vacation-request/vacation-request.page').then((m) => m.VacationRequestPage),

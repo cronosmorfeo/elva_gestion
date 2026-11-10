@@ -63,7 +63,7 @@ export class LoginPage {
 
       // Validación de redirección solicitada
       if (result.tipo_colaborador === 'regular') {
-        this.router.navigateByUrl('/tabs/vacaciones', { replaceUrl: true });
+        this.router.navigateByUrl('/tabs/inicio', { replaceUrl: true });
       } else {
         // Redirección por defecto si es otro rol (ej. admin)
         this.router.navigateByUrl('/tabs/dashboard', { replaceUrl: true });

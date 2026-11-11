@@ -1,5 +1,28 @@
 @if (signedIn() && !ownHeader()) {
-<ion-header>
+<ng-template #navLinks>
+  <a routerLink="/tabs/inicio" routerLinkActive="active" ariaCurrentWhenActive="page">Inicio</a>
+  <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
+  <a routerLink="/tabs/horas-extra" routerLinkActive="active" ariaCurrentWhenActive="page">Horas extra</a>
+  <a routerLink="/tabs/reporte" routerLinkActive="active" ariaCurrentWhenActive="page">Mi reporte</a>
+  <a routerLink="/tabs/solicitudes" routerLinkActive="active" ariaCurrentWhenActive="page">Mis solicitudes</a>
+  <a routerLink="/tabs/avisos" routerLinkActive="active" ariaCurrentWhenActive="page">
+    Avisos @if (unseenNotices() > 0) {
+    <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
+    }
+  </a>
+  <a routerLink="/tabs/perfil" routerLinkActive="active" ariaCurrentWhenActive="page">Mi perfil</a>
+  @if (isAdmin()) {
+  <a routerLink="/tabs/dashboard">Panel de administración</a>
+  }
+</ng-template>
+<ng-template #navActions>
+  @if (notifyState() === 'off') {
+  <button type="button" class="notify" (click)="enableNotifications()">Activar notificaciones</button>
+  }
+  <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
+</ng-template>
+
+<ion-header (keydown.escape)="closeMenu()">
   <ion-toolbar class="navbar">
     <nav class="navbar-content" aria-label="Menú principal">
       <a class="brand" routerLink="/tabs/inicio" aria-label="Inicio">
@@ -7,26 +30,34 @@
         <span class="brand-name">ELVA Gestión</span>
       </a>
       <div class="links">
-        <a routerLink="/tabs/inicio" routerLinkActive="active" ariaCurrentWhenActive="page">Inicio</a>
-        <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
-        <a routerLink="/tabs/horas-extra" routerLinkActive="active" ariaCurrentWhenActive="page">Horas extra</a>
-        <a routerLink="/tabs/reporte" routerLinkActive="active" ariaCurrentWhenActive="page">Mi reporte</a>
-        <a routerLink="/tabs/solicitudes" routerLinkActive="active" ariaCurrentWhenActive="page">Mis solicitudes</a>
-        <a routerLink="/tabs/avisos" routerLinkActive="active" ariaCurrentWhenActive="page">
-          Avisos @if (unseenNotices() > 0) {
-          <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
-          }
-        </a>
-        @if (isAdmin()) {
-        <a routerLink="/tabs/dashboard">Panel de administración</a>
-        }
+        <ng-container [ngTemplateOutlet]="navLinks" />
       </div>
-      @if (notifyState() === 'off') {
-      <button type="button" class="notify" (click)="enableNotifications()">Activar notificaciones</button>
-      }
-      <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
+      <div class="actions">
+        <ng-container [ngTemplateOutlet]="navActions" />
+      </div>
+      <!-- Small screens: the links do not fit, so they open in a list below the bar. -->
+      <button
+        type="button"
+        class="menu-btn"
+        aria-controls="mobile-menu"
+        [attr.aria-expanded]="menuOpen()"
+        (click)="toggleMenu()"
+      >
+        <span aria-hidden="true">{{ menuOpen() ? '✕' : '☰' }}</span>
+        {{ menuOpen() ? 'Cerrar' : 'Menú' }} @if (!menuOpen() && unseenNotices() > 0) {
+        <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
+        }
+      </button>
     </nav>
   </ion-toolbar>
+  @if (menuOpen()) {
+  <nav id="mobile-menu" class="mobile-menu" aria-label="Menú principal">
+    <ng-container [ngTemplateOutlet]="navLinks" />
+    <div class="mobile-actions">
+      <ng-container [ngTemplateOutlet]="navActions" />
+    </div>
+  </nav>
+  }
 </ion-header>
 }
 

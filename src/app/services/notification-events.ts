@@ -43,7 +43,7 @@ export function vacationEvents(before: LastSeen, list: VacationRequest[], admin:
   return decided(before, list).map((r) => ({
     tag: `${COLLECTIONS.vacations}-${r.id}-${r.status}`,
     title: `Sus vacaciones fueron ${r.status === 'aprobada' ? 'aprobadas' : 'rechazadas'}`,
-    body: `Vacaciones ${dates(r)}.`,
+    body: `Vacaciones ${dates(r)}.${reasonText(r)}`,
     url: '/tabs/solicitudes',
   }));
 }
@@ -69,7 +69,7 @@ export function overtimeEvents(before: LastSeen, list: OvertimeRequest[], admin:
   return decided(before, list).map((r) => ({
     tag: `${COLLECTIONS.overtime}-${r.id}-${r.status}`,
     title: `Sus horas extra fueron ${r.status === 'aprobada' ? 'aprobadas' : 'rechazadas'}`,
-    body: `Horas extra ${when(r)}.`,
+    body: `Horas extra ${when(r)}.${reasonText(r)}`,
     url: '/tabs/solicitudes',
   }));
 }
@@ -96,6 +96,10 @@ function cancelled<T extends { id: string; status: RequestStatus }>(
   return list
     .filter((r) => r.status === 'cancelada' && ['pendiente', 'aprobada'].includes(before.get(r.id) ?? ''))
     .map((r) => ({ request: r, wasApproved: before.get(r.id) === 'aprobada' }));
+}
+
+function reasonText(r: { status: RequestStatus; reason?: string }): string {
+  return r.status === 'rechazada' && r.reason ? ` Motivo: ${r.reason}` : '';
 }
 
 function approvedNote(days: number | undefined): string {

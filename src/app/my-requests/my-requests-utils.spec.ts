@@ -86,6 +86,7 @@ const row = (id: string, month: string, status: RequestRow['status']): RequestRo
   month,
   start: `${month}-15`,
   returnDays: 0,
+  reason: '',
 });
 
 describe('month filter', () => {

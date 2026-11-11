@@ -27,6 +27,7 @@ describe('toVacationRequest', () => {
       status: 'pendiente',
       ownerId: undefined,
       deductedDays: undefined,
+      reason: undefined,
       comment: 'Viaje familiar',
       sentAt: '2026-11-09T10:55',
     });
@@ -42,6 +43,11 @@ describe('toVacationRequest', () => {
   it('reads the days deducted at approval', () => {
     const r = toVacationRequest('abc', { ...vacation, estado: 'aprobada', decision: { por: 'x', diasDescontados: 5 } });
     expect(r?.deductedDays).toBe(5);
+  });
+
+  it('reads the rejection reason', () => {
+    const r = toVacationRequest('abc', { ...vacation, estado: 'rechazada', decision: { motivo: ' Equipo completo ' } });
+    expect(r?.reason).toBe('Equipo completo');
   });
 
   it('uses the email when there is no name', () => {
@@ -78,6 +84,7 @@ describe('toOvertimeRequest', () => {
       rhReviewed: true,
       status: 'rechazada',
       ownerId: 'u1',
+      reason: undefined,
       sentAt: '2026-11-09T11:00',
     });
   });

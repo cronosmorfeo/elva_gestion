@@ -37,6 +37,7 @@ export function toVacationRequest(id: string, data: DocumentData): VacationReque
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
     deductedDays: deductedDays(data['decision']),
+    reason: reason(data['decision']),
     comment: text(data['comentarioRRHH']) || undefined,
     sentAt: dateTime(data['fechaSolicitud']),
   };
@@ -56,6 +57,7 @@ export function toOvertimeRequest(id: string, data: DocumentData): OvertimeReque
     rhReviewed: true,
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
+    reason: reason(data['decision']),
     sentAt: dateTime(data['fechaSolicitud']),
   };
 }
@@ -101,6 +103,12 @@ export function sortBySent<T extends { sentAt?: string }>(list: T[]): T[] {
 function status(value: unknown): RequestStatus {
   const s = text(value);
   return STATUSES.includes(s) ? (s as RequestStatus) : 'pendiente';
+}
+
+function reason(decision: unknown): string | undefined {
+  const value: unknown =
+    typeof decision === 'object' && decision !== null ? (decision as Record<string, unknown>)['motivo'] : undefined;
+  return text(value) || undefined;
 }
 
 function deductedDays(decision: unknown): number | undefined {

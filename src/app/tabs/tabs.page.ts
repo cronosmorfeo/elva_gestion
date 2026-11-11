@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, DestroyRef, EnvironmentInjector, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { IonHeader, IonTabs, IonToolbar, ToastController } from '@ionic/angular';
@@ -18,7 +19,7 @@ const OWN_HEADER = ['/tabs/login', '/tabs/dashboard', '/tabs/tab3'];
   selector: 'app-tabs',
   templateUrl: 'tabs.page.html',
   styleUrls: ['tabs.page.scss'],
-  imports: [IonHeader, IonToolbar, IonTabs, RouterLink, RouterLinkActive, NotificationCardsComponent],
+  imports: [IonHeader, IonToolbar, IonTabs, NgTemplateOutlet, RouterLink, RouterLinkActive, NotificationCardsComponent],
 })
 export class TabsPage {
   public environmentInjector = inject(EnvironmentInjector);
@@ -32,11 +33,16 @@ export class TabsPage {
   readonly signedIn = signal(false);
   readonly isAdmin = signal(false);
   readonly ownHeader = signal(true);
+  // Small screens only: the list of links under the bar.
+  readonly menuOpen = signal(false);
 
   constructor() {
     const destroyRef = inject(DestroyRef);
     const routerEvents = this.router.events.subscribe((event) => {
-      if (event instanceof NavigationEnd) this.ownHeader.set(hasOwnHeader(event.urlAfterRedirects));
+      if (event instanceof NavigationEnd) {
+        this.ownHeader.set(hasOwnHeader(event.urlAfterRedirects));
+        this.menuOpen.set(false);
+      }
     });
     destroyRef.onDestroy(() => routerEvents.unsubscribe());
 
@@ -51,6 +57,14 @@ export class TabsPage {
     destroyRef.onDestroy(stop);
   }
 
+  toggleMenu(): void {
+    this.menuOpen.update((open) => !open);
+  }
+
+  closeMenu(): void {
+    this.menuOpen.set(false);
+  }
+
   async enableNotifications(): Promise<void> {
     const uid = getAuth().currentUser?.uid;
     if (!uid) return;
@@ -63,6 +77,7 @@ export class TabsPage {
   }
 
   async logout(): Promise<void> {
+    this.menuOpen.set(false);
     await this.notifications.disable();
     await signOut(getAuth());
     this.store.forgetWorker();

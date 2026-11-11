@@ -19,6 +19,7 @@ export interface VacationRequest {
   ownerId?: string;
   email?: string;
   deductedDays?: number; // days taken from the balance when it was approved (returned if cancelled)
+  reason?: string; // why it was rejected (the worker sees it)
   comment?: string;
   sentAt?: string; // YYYY-MM-DDTHH:mm
   sample?: boolean;
@@ -34,6 +35,7 @@ export interface OvertimeRequest {
   status: RequestStatus;
   ownerId?: string;
   email?: string;
+  reason?: string; // why it was rejected (the worker sees it)
   sentAt?: string;
   sample?: boolean;
 }

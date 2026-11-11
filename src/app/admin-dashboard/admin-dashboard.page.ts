@@ -8,10 +8,12 @@ import type { NoticeInput } from '../notices/notice-utils';
 import { MAX_NOTICE_MESSAGE, MAX_NOTICE_TITLE, noticeProblem } from '../notices/notice-utils';
 import { fileKind, formatFileSize, unseenCount, weekLabel } from '../reports/report-utils';
 import { AuthService } from '../services/auth';
+import { bankProblem, updatedText } from '../services/bank-account';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 import type { ApproveResult } from '../services/vacation-balance';
 import { ApproveError, approveProblemText } from '../services/vacation-balance';
+import { COUNTRY_OPTIONS, CURRENCY_OPTIONS, ROLE_OPTIONS, SCHEDULES, roleLabel } from '../shared/employee-labels';
 import {
   currencySymbol,
   formatCedula,
@@ -50,6 +52,8 @@ import {
   vacationDays,
 } from './admin-requests';
 import { SAMPLE_EMPLOYEES, SAMPLE_PAYEES, SAMPLE_PAYMENTS } from './admin-sample-data';
+import { MAX_REASON, reasonProblem, vacationConflicts } from './decisions';
+import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
   id: string;
@@ -96,33 +100,6 @@ interface EditForm {
 type EditField =
   'nombre' | 'tipo' | 'pais' | 'fechaIngreso' | 'moneda' | 'jornada' | 'horaInicio' | 'horaFin' | 'monedaCuenta';
 
-const ROLE_OPTIONS = [
-  { value: 'regular', label: 'Trabajador' },
-  { value: 'rh', label: 'Recursos Humanos' },
-  { value: 'admin', label: 'Administrador' },
-];
-
-const COUNTRY_OPTIONS = [
-  { value: 'CR', label: 'Costa Rica' },
-  { value: 'PA', label: 'Panamá' },
-  { value: 'GT', label: 'Guatemala' },
-  { value: 'SV', label: 'El Salvador' },
-  { value: 'HN', label: 'Honduras' },
-  { value: 'NI', label: 'Nicaragua' },
-  { value: 'MX', label: 'México' },
-  { value: 'US', label: 'Estados Unidos' },
-  { value: 'CO', label: 'Colombia' },
-];
-
-const CURRENCY_OPTIONS = [
-  { value: 'CRC', label: 'CRC - Colón costarricense' },
-  { value: 'USD', label: 'USD - Dólar estadounidense' },
-  { value: 'EUR', label: 'EUR - Euro' },
-  { value: 'MXN', label: 'MXN - Peso mexicano' },
-  { value: 'COP', label: 'COP - Peso colombiano' },
-  { value: 'PAB', label: 'PAB - Balboa panameño' },
-];
-
 const SECTIONS = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'vacaciones', label: 'Vacaciones' },
@@ -132,27 +109,12 @@ const SECTIONS = [
   { id: 'avisos', label: 'Avisos' },
 ];
 
-const SCHEDULES: Record<string, string> = {
-  completa: 'Tiempo completo',
-  medio: 'Medio tiempo',
-  parcial: 'Jornada parcial',
-  nocturna: 'Jornada nocturna',
-  flexible: 'Horario flexible',
-};
-
 const STATUS_TABS: { id: RequestStatus; label: string }[] = [
   { id: 'pendiente', label: 'Pendientes' },
   { id: 'aprobada', label: 'Aprobadas' },
   { id: 'rechazada', label: 'Rechazadas' },
   { id: 'cancelada', label: 'Canceladas' },
 ];
-
-function roleLabel(tipo: unknown): string {
-  const value = typeof tipo === 'string' ? tipo.trim().toLowerCase() : '';
-  if (value === 'admin') return 'Administrador';
-  if (value === 'rh') return 'Recursos Humanos';
-  return 'Trabajador';
-}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -266,8 +228,24 @@ export class AdminDashboardPage {
   readonly employeesState = signal<'loading' | 'ready' | 'error'>('loading');
   readonly search = signal('');
 
-  readonly vacationCounts = computed(() => countByStatus(this.vacations()));
-  readonly overtimeCounts = computed(() => countByStatus(this.overtime()));
+  // Search by name or email and filter by month, in the vacation and overtime sections.
+  readonly vacSearch = signal('');
+  readonly vacMonth = signal(ALL_MONTHS);
+  readonly otSearch = signal('');
+  readonly otMonth = signal(ALL_MONTHS);
+  readonly vacMonths = computed(() => requestMonths(this.vacations()));
+  readonly otMonths = computed(() => requestMonths(this.overtime()));
+  private readonly shownVacations = computed(() =>
+    this.vacations().filter((r) => matchesRequest(r, this.vacSearch(), this.vacMonth())),
+  );
+  private readonly shownOvertime = computed(() =>
+    this.overtime().filter((r) => matchesRequest(r, this.otSearch(), this.otMonth())),
+  );
+  readonly vacFiltered = computed(() => !!this.vacSearch().trim() || this.vacMonth() !== ALL_MONTHS);
+  readonly otFiltered = computed(() => !!this.otSearch().trim() || this.otMonth() !== ALL_MONTHS);
+
+  readonly vacationCounts = computed(() => countByStatus(this.shownVacations()));
+  readonly overtimeCounts = computed(() => countByStatus(this.shownOvertime()));
 
   readonly summary = computed(() => {
     const vac = this.vacations();
@@ -290,7 +268,7 @@ export class AdminDashboardPage {
   });
 
   readonly vacationRows = computed(() =>
-    this.vacations()
+    this.shownVacations()
       .filter((r) => r.status === this.vacationTab())
       .map((r) => ({
         id: r.id,
@@ -303,11 +281,13 @@ export class AdminDashboardPage {
         canDecide: r.status === 'pendiente' && r.rhReviewed,
         waiting: r.status === 'pendiente' && !r.rhReviewed,
         status: r.status,
+        conflicts: r.status === 'pendiente' ? vacationConflicts(r, this.vacations()).join(', ') : '',
+        reason: r.reason ?? '',
       })),
   );
 
   readonly overtimeRows = computed(() =>
-    this.overtime()
+    this.shownOvertime()
       .filter((r) => r.status === this.overtimeTab())
       .map((r) => ({
         id: r.id,
@@ -324,6 +304,7 @@ export class AdminDashboardPage {
         canDecide: r.status === 'pendiente' && r.rhReviewed,
         waiting: r.status === 'pendiente' && !r.rhReviewed,
         status: r.status,
+        reason: r.reason ?? '',
       })),
   );
 
@@ -388,11 +369,17 @@ export class AdminDashboardPage {
       schedule: scheduleText(f.horaInicio, f.horaFin),
       hours: scheduleText(f.horaInicio, f.horaFin) ? hoursText(shiftMinutes(f.horaInicio, f.horaFin)) : '',
       cedulaError: Boolean(f.cedula) && !isValidCedula(f.cedula),
+      bankError: f.sample ? '' : bankProblem(f.cedula, f.iban, f.monedaCuenta),
       ibanComplete: normalizeIban(f.iban).length >= 22,
       ibanValid: isValidCrIban(f.iban),
       missing: missing.length ? `Falta: ${missing.join(', ')}.` : '',
       vacationError,
-      canSave: missing.length === 0 && !vacationError && changed && !this.editSaving(),
+      canSave:
+        missing.length === 0 &&
+        !vacationError &&
+        (f.sample || (this.editBank() === 'ready' && !bankProblem(f.cedula, f.iban, f.monedaCuenta))) &&
+        changed &&
+        !this.editSaving(),
       changed,
     };
   });
@@ -416,6 +403,20 @@ export class AdminDashboardPage {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  setRequestFilter(target: 'vacSearch' | 'vacMonth' | 'otSearch' | 'otMonth', event: Event): void {
+    this[target].set((event.target as HTMLInputElement | HTMLSelectElement).value);
+  }
+
+  clearRequestFilter(kind: 'vac' | 'ot'): void {
+    if (kind === 'vac') {
+      this.vacSearch.set('');
+      this.vacMonth.set(ALL_MONTHS);
+    } else {
+      this.otSearch.set('');
+      this.otMonth.set(ALL_MONTHS);
+    }
+  }
+
   setSearch(event: Event): void {
     this.search.set((event.target as HTMLInputElement).value);
   }
@@ -424,8 +425,7 @@ export class AdminDashboardPage {
     const request = this.vacations().find((r) => r.id === id);
     if (!request) return;
     if (status === 'rechazada') {
-      if (!(await this.saved(this.store.decideVacation(id, status)))) return;
-      await this.logDecision(`las vacaciones de ${request.employee}`, status);
+      this.openReject('vacaciones', id, request.employee);
       return;
     }
     const owner = ownerOf(request, this.employees());
@@ -459,8 +459,60 @@ export class AdminDashboardPage {
   async decideOvertime(id: string, status: RequestStatus): Promise<void> {
     const request = this.overtime().find((r) => r.id === id);
     if (!request) return;
-    if (!(await this.saved(this.store.decideOvertime(id, status)))) return;
+    if (status === 'rechazada') {
+      this.openReject('horas', id, request.employee);
+      return;
+    }
+    if (!(await this.saved(this.store.approveOvertime(id)))) return;
     await this.logDecision(`las horas extra de ${request.employee}`, status);
+  }
+
+  // Rejecting asks for a reason in a small window; the worker sees it in "Mis solicitudes".
+  readonly maxReason = MAX_REASON;
+  readonly rejecting = signal<{ kind: 'vacaciones' | 'horas'; id: string; employee: string; reason: string } | null>(
+    null,
+  );
+  readonly rejectError = computed(() => {
+    const r = this.rejecting();
+    return r ? reasonProblem(r.reason) : '';
+  });
+  readonly rejectSaving = signal(false);
+
+  private openReject(kind: 'vacaciones' | 'horas', id: string, employee: string): void {
+    this.rejecting.set({ kind, id, employee, reason: '' });
+    setTimeout(() => document.getElementById('reject-reason')?.focus());
+  }
+
+  setRejectReason(event: Event): void {
+    const reason = (event.target as HTMLTextAreaElement).value;
+    this.rejecting.update((r) => (r ? { ...r, reason } : r));
+  }
+
+  closeReject(): void {
+    this.rejecting.set(null);
+  }
+
+  async confirmReject(): Promise<void> {
+    const r = this.rejecting();
+    if (!r || this.rejectError() || this.rejectSaving()) return;
+    this.rejectSaving.set(true);
+    try {
+      await this.store.rejectRequest(r.kind, r.id, r.reason);
+    } catch (err) {
+      const message =
+        err instanceof ApproveError
+          ? approveProblemText(err.problem, r.employee, 0)
+          : 'No se pudo guardar. Revisá la conexión e intentá de nuevo.';
+      if (!(err instanceof ApproveError)) console.error('[AdminDashboard] Could not reject:', err);
+      const toast = await this.toast.create({ message, duration: 5000, position: 'bottom' });
+      await toast.present();
+      return;
+    } finally {
+      this.rejectSaving.set(false);
+    }
+    this.rejecting.set(null);
+    const what = r.kind === 'vacaciones' ? 'las vacaciones' : 'las horas extra';
+    await this.logDecision(`${what} de ${r.employee}`, 'rechazada');
   }
 
   openNotice(id?: string): void {
@@ -624,6 +676,58 @@ export class AdminDashboardPage {
     this.editOriginal.set(JSON.stringify(form));
     this.editError.set('');
     setTimeout(() => document.getElementById('edit-close')?.focus());
+    if (!e.sample) void this.loadEditBank(e.id);
+  }
+
+  // The payment account lives apart (colaboradores/{uid}/privado/pago), so it loads after the window opens.
+  readonly editBank = signal<'loading' | 'ready' | 'error'>('ready');
+  readonly editBankUpdated = signal('');
+
+  private async loadEditBank(id: string): Promise<void> {
+    this.editBank.set('loading');
+    this.editBankUpdated.set('');
+    try {
+      const account = await this.store.loadBankAccount(id);
+      const f = this.editing();
+      if (!f || f.id !== id) return;
+      const filled = {
+        ...f,
+        cedula: account?.cedula ?? '',
+        iban: account ? groupIban(account.iban) : '',
+        monedaCuenta: account?.currency ?? '',
+      };
+      // What was saved is the starting point, so only real changes enable "Guardar cambios".
+      const original = JSON.parse(this.editOriginal()) as EditForm;
+      this.editOriginal.set(
+        JSON.stringify({ ...original, cedula: filled.cedula, iban: filled.iban, monedaCuenta: filled.monedaCuenta }),
+      );
+      this.editing.set(filled);
+      this.editBankUpdated.set(updatedText(account?.updatedAt));
+      this.editBank.set('ready');
+    } catch (err) {
+      console.error('[AdminDashboard] Could not load the payment account:', err);
+      this.editBank.set('error');
+    }
+  }
+
+  // Requests from workers to change their payment account. The admin agrees the new one by Slack.
+  readonly bankRequests = computed(() =>
+    this.store.bankRequests().map((r) => ({
+      ...r,
+      sent: r.sentAt ? `Enviada el ${formatShortDate(r.sentAt)}, ${formatTime(r.sentAt)}` : '',
+    })),
+  );
+
+  editFromRequest(uid: string): void {
+    if (this.employees().some((e) => e.id === uid)) this.openEdit(uid);
+  }
+
+  async resolveBankRequest(id: string, employee: string): Promise<void> {
+    if (!(await this.saved(this.store.resolveBankRequest(id)))) return;
+    await this.log(
+      `${this.profileName() || 'Vos'} atendió la solicitud de cambio de cuenta de ${employee}`,
+      'Solicitud marcada como atendida.',
+    );
   }
 
   closeEdit(): void {
@@ -698,10 +802,16 @@ export class AdminDashboardPage {
     };
     this.editSaving.set(true);
     this.editError.set('');
+    let bankChanged = false;
     try {
-      // Sample employees only change on screen. Payment data is not saved yet (the backend decides where).
+      // Sample employees only change on screen.
+      const before = JSON.parse(this.editOriginal()) as EditForm;
+      bankChanged = before.cedula !== f.cedula || before.iban !== f.iban || before.monedaCuenta !== f.monedaCuenta;
       if (!f.sample) {
         await updateDoc(doc(getFirestore(), 'colaboradores', f.id), { ...changes, updatedAt: serverTimestamp() });
+        if (bankChanged) {
+          await this.store.saveBankAccount(f.id, { cedula: f.cedula, iban: f.iban, currency: f.monedaCuenta });
+        }
       }
       this.employees.update((list) =>
         list.map((e) =>
@@ -727,7 +837,7 @@ export class AdminDashboardPage {
       );
       this.editing.set(null);
       await this.log(
-        `${this.profileName() || 'Vos'} editó los datos de ${changes.nombre}`,
+        `${this.profileName() || 'Vos'} editó los datos de ${changes.nombre}${bankChanged ? ' (cambió la cuenta de pago)' : ''}`,
         f.sample ? 'Cambios aplicados. Es un empleado de ejemplo: no se guarda.' : 'Cambios guardados.',
       );
     } catch {

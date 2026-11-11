@@ -44,6 +44,8 @@
         <span class="detail">{{ r.detail }}</span>
         @if (r.note) {
         <p class="request-note">{{ r.note }}</p>
+        } @if (r.reason) {
+        <p class="request-reason"><strong>Motivo del rechazo:</strong> {{ r.reason }}</p>
         }
         <span class="meta">{{ r.sent }}{{ r.sample ? ' · Ejemplo' : '' }}</span>
         @if (r.cancellable) { @if (confirmCancelId() === r.id) {

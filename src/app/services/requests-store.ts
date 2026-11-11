@@ -6,11 +6,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getFirestore,
   onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -20,8 +22,19 @@ import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-d
 import { vacationDays } from '../admin-dashboard/admin-requests';
 import type { Notice, NoticeInput } from '../notices/notice-utils';
 import { localDateTime, sortNotices, unseenNotices } from '../notices/notice-utils';
+import type { Profile } from '../profile/profile-utils';
+import { toProfile } from '../profile/profile-utils';
 import type { ReportFile, WorkReport } from '../reports/report-utils';
 
+import type { BankAccount, BankChangeRequest } from './bank-account';
+import {
+  BANK_REQUESTS,
+  bankChangedEvent,
+  bankDocPath,
+  bankRequestEvents,
+  toBankAccount,
+  toBankChangeRequest,
+} from './bank-account';
 import type { Worker } from './current-worker';
 import { currentWorker } from './current-worker';
 import {
@@ -52,6 +65,14 @@ export class RequestsStore {
   readonly loadError = signal(false);
   // The signed-in person's vacation balance (colaboradores.vacaciones_disponibles), live. null = not on record.
   readonly myBalance = signal<number | null>(null);
+  // The signed-in person's own data (colaboradores/{uid}), live, for "Mi perfil".
+  readonly myProfile = signal<Profile | null>(null);
+  // The signed-in person's payment account (read only for them) and their latest change request.
+  readonly myBank = signal<BankAccount | null>(null);
+  readonly myBankLoaded = signal(false);
+  readonly myBankRequest = signal<BankChangeRequest | null>(null);
+  // For admins: requests from workers to change their payment account.
+  readonly bankRequests = signal<BankChangeRequest[]>([]);
   readonly myUid = signal('');
   readonly myPendingVacationDays = computed(() =>
     this.vacations()
@@ -108,10 +129,38 @@ export class RequestsStore {
       (snap) => {
         const balance: unknown = snap.data()?.['vacaciones_disponibles'];
         this.myBalance.set(typeof balance === 'number' ? balance : null);
+        this.myProfile.set(toProfile(snap.data()));
       },
-      (err) => console.error('[RequestsStore] Could not read the vacation balance:', err),
+      (err) => console.error('[RequestsStore] Could not read my profile:', err),
     );
     this.stops.push(stopBalance);
+    let bankBefore: string | null | undefined;
+    const stopBank = onSnapshot(
+      doc(db, bankDocPath(uid)[0], ...bankDocPath(uid).slice(1)),
+      (snap) => {
+        const account = toBankAccount(snap.data());
+        const changed = bankChangedEvent(bankBefore, account);
+        if (changed) void this.notifications.show(changed);
+        bankBefore = account?.iban ?? null;
+        this.myBank.set(account);
+        this.myBankLoaded.set(true);
+      },
+      (err) => {
+        console.error('[RequestsStore] Could not read my payment account:', err);
+        this.myBankLoaded.set(true);
+      },
+    );
+    this.stops.push(stopBank);
+    let bankRequestsSeen: LastSeen = null;
+    this.listen(scoped(BANK_REQUESTS), (s) => {
+      const list = sortBySent(mapDocs(s, toBankChangeRequest));
+      this.myBankRequest.set(list.find((r) => r.uid === uid) ?? null);
+      if (admin) {
+        this.bankRequests.set(list.filter((r) => r.status === 'pendiente'));
+        this.notify(bankRequestEvents(bankRequestsSeen, list));
+        bankRequestsSeen = lastSeen(list.map((r) => ({ id: r.id })));
+      }
+    });
     this.listen(collection(db, COLLECTIONS.notices), (s) => {
       const list = mapDocs(s, toNotice);
       this.notices.set(list);
@@ -126,6 +175,11 @@ export class RequestsStore {
     this.uid = '';
     this.myUid.set('');
     this.myBalance.set(null);
+    this.myProfile.set(null);
+    this.myBank.set(null);
+    this.myBankLoaded.set(false);
+    this.myBankRequest.set(null);
+    this.bankRequests.set([]);
     this.vacations.set([]);
     this.overtime.set([]);
     this.notices.set([]);
@@ -148,8 +202,22 @@ export class RequestsStore {
     });
   }
 
-  decideVacation(id: string, status: RequestStatus): Promise<void> {
-    return this.decide(COLLECTIONS.vacations, id, status);
+  // Rejects with a reason the worker will read. In a transaction, so a request the worker just
+  // cancelled, or another admin just decided, is not overwritten.
+  async rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string): Promise<void> {
+    const db = getFirestore();
+    const ref = doc(db, kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new ApproveError('no-existe');
+      const estado: unknown = snap.data()['estado'];
+      if (estado === 'cancelada') throw new ApproveError('cancelada');
+      if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
+      tx.update(ref, {
+        estado: 'rechazada',
+        decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim() },
+      });
+    });
   }
 
   // Approves and deducts the days from colaboradores/{uid}.vacaciones_disponibles in one transaction:
@@ -217,8 +285,44 @@ export class RequestsStore {
     });
   }
 
-  decideOvertime(id: string, status: RequestStatus): Promise<void> {
-    return this.decide(COLLECTIONS.overtime, id, status);
+  // The worker asks RH to change their payment account. The new account is agreed by Slack.
+  async requestBankChange(note: string): Promise<void> {
+    const owner = await this.signedInWorker();
+    await addDoc(collection(getFirestore(), BANK_REQUESTS), {
+      uid: owner.uid,
+      nombre: owner.name,
+      nota: note.trim(),
+      estado: 'pendiente',
+      fecha: serverTimestamp(),
+    });
+  }
+
+  async resolveBankRequest(id: string): Promise<void> {
+    await updateDoc(doc(getFirestore(), BANK_REQUESTS, id), {
+      estado: 'atendida',
+      atendida: { por: this.uid, fecha: serverTimestamp() },
+    });
+  }
+
+  // Admin/RH only (Edit employee). TODO: the Firestore rules must enforce that.
+  async loadBankAccount(uid: string): Promise<BankAccount | null> {
+    const [col, ...rest] = bankDocPath(uid);
+    return toBankAccount((await getDoc(doc(getFirestore(), col, ...rest))).data());
+  }
+
+  async saveBankAccount(uid: string, account: { cedula: string; iban: string; currency: string }): Promise<void> {
+    const [col, ...rest] = bankDocPath(uid);
+    await setDoc(doc(getFirestore(), col, ...rest), {
+      cedula: account.cedula.trim(),
+      iban: account.iban.replace(/\s+/g, '').toUpperCase(),
+      monedaCuenta: account.currency,
+      updatedAt: serverTimestamp(),
+      updatedBy: this.uid,
+    });
+  }
+
+  approveOvertime(id: string): Promise<void> {
+    return this.decide(COLLECTIONS.overtime, id, 'aprobada');
   }
 
   async saveNotice(input: NoticeInput, author: string, id?: string): Promise<void> {

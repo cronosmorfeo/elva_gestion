@@ -49,6 +49,13 @@ describe('vacationEvents', () => {
     ]);
   });
 
+  it('includes the rejection reason for the worker', () => {
+    const rejected = { ...vac('a', 'rechazada'), reason: 'Equipo completo esa semana' };
+    expect(vacationEvents(lastSeen([vac('a', 'pendiente')]), [rejected], false)[0].body).toBe(
+      'Vacaciones del lun 23 nov al dom 29 nov. Motivo: Equipo completo esa semana',
+    );
+  });
+
   it('tells admins, not the worker, about cancellations', () => {
     expect(vacationEvents(lastSeen([vac('a', 'pendiente')]), [vac('a', 'cancelada')], false)).toEqual([]);
     const approved = { ...vac('a', 'cancelada'), deductedDays: 5 };

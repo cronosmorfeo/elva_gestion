@@ -1,0 +1,107 @@
+<ion-content [fullscreen]="true" class="elva-worker">
+  <div class="page">
+    <h1>Mi perfil</h1>
+    <p class="intro">Estos son los datos que tiene registrados Recursos Humanos. Si algo está mal, avísele a RH.</p>
+
+    @if (profile(); as p) {
+    <section class="card profile-card" aria-labelledby="p-personal">
+      <h2 id="p-personal">Datos personales</h2>
+      <dl class="profile-list">
+        <dt>Nombre</dt>
+        <dd>{{ p.name }}</dd>
+        <dt>Correo</dt>
+        <dd>{{ p.email }}</dd>
+        <dt>País</dt>
+        <dd>{{ p.country }}</dd>
+        <dt>Tipo de cuenta</dt>
+        <dd>{{ p.role }}</dd>
+      </dl>
+    </section>
+
+    <section class="card profile-card" aria-labelledby="p-work">
+      <h2 id="p-work">Trabajo</h2>
+      <dl class="profile-list">
+        <dt>Fecha de ingreso</dt>
+        <dd>
+          {{ startText() }} @if (seniorityText()) {
+          <span class="profile-note">{{ seniorityText() }}</span>
+          }
+        </dd>
+        <dt>Jornada</dt>
+        <dd>{{ p.schedule }}</dd>
+        <dt>Horario</dt>
+        <dd>{{ p.hours }}</dd>
+        <dt>Salario mensual</dt>
+        <dd>{{ p.salary }}</dd>
+        <dt>Estado</dt>
+        <dd>{{ p.active ? 'Activo' : 'Inactivo' }}</dd>
+      </dl>
+    </section>
+
+    <section class="card profile-card" aria-labelledby="p-vac">
+      <h2 id="p-vac">Vacaciones</h2>
+      <dl class="profile-list">
+        <dt>Saldo registrado</dt>
+        <dd>{{ balance() === null ? 'Sin saldo registrado' : balance() + ' días' }}</dd>
+        <dt>Disponibles para pedir</dt>
+        <dd>
+          {{ available() ?? '—' }} @if (pendingDays() > 0) {
+          <span class="profile-note">Ya se restaron {{ pendingDays() }} de solicitudes pendientes</span>
+          }
+        </dd>
+      </dl>
+    </section>
+
+    <section class="card profile-card" aria-labelledby="p-bank">
+      <h2 id="p-bank">Datos de pago</h2>
+      @if (!bankLoaded()) {
+      <p class="profile-empty">Cargando…</p>
+      } @else if (bank(); as b) {
+      <dl class="profile-list">
+        <dt>Cuenta IBAN</dt>
+        <dd>
+          <span class="mono">{{ b.iban }}</span>
+          <button type="button" class="profile-toggle" (click)="toggleIban()" [attr.aria-pressed]="showIban()">
+            {{ showIban() ? 'Ocultar' : 'Mostrar' }}
+          </button>
+        </dd>
+        <dt>Moneda de la cuenta</dt>
+        <dd>{{ b.currency }}</dd>
+        <dt>Cédula</dt>
+        <dd>{{ b.cedula }}</dd>
+      </dl>
+      <p class="profile-note">Es la misma cuenta a la que la administración hace sus pagos. {{ b.updated }}</p>
+      } @else {
+      <p class="profile-empty">Todavía no registrados. RH los agrega cuando usted le pase su cuenta.</p>
+      } @if (bankLoaded()) { @if (pendingRequest()) {
+      <p class="profile-request">
+        Pidió cambiar su cuenta el {{ requestSent() }}. RH lo va a contactar por Slack para confirmar la cuenta nueva.
+      </p>
+      } @else if (asking()) {
+      <div class="profile-ask">
+        <label for="bank-note">Nota para RH (opcional)</label>
+        <textarea
+          id="bank-note"
+          rows="2"
+          placeholder="Ej.: Cambié de banco."
+          [attr.maxlength]="maxNote"
+          [value]="note()"
+          (input)="setNote($event)"
+        ></textarea>
+        <span class="profile-note">No escriba aquí el número de cuenta nuevo: lo confirma con RH por Slack.</span>
+        <div class="cancel-actions">
+          <button type="button" class="cancel-no" (click)="asking.set(false)" [disabled]="sending()">Cancelar</button>
+          <button type="button" class="profile-send" (click)="sendRequest()" [disabled]="sending()">
+            Enviar solicitud
+          </button>
+        </div>
+      </div>
+      } @else {
+      <button type="button" class="profile-change" (click)="askChange()">Solicitar cambio de cuenta</button>
+      } }
+    </section>
+    } @else {
+    <p class="note">Cargando…</p>
+    }
+  </div>
+</ion-content>

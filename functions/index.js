@@ -2,6 +2,8 @@
 // - Admins (admin/rh): a new vacation or overtime request.
 // - The worker: their request was approved or rejected.
 // - Admins (admin/rh): a worker cancelled a pending or approved request.
+// - Admins (admin/rh): a worker asked to change their payment account.
+// - The worker: their payment account changed (catches changes they did not ask for).
 // - Every active worker: a new notice.
 // Tokens live in users/{uid}/fcmTokens/{token}, saved by PushNotificationService in the app.
 // The tag matches the in-page notification, so the browser shows only one if both arrive.
@@ -10,7 +12,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { setGlobalOptions } = require('firebase-functions/v2');
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const logger = require('firebase-functions/logger');
 
 setGlobalOptions({ maxInstances: 5 });
@@ -21,6 +23,7 @@ const db = getFirestore();
 const VACATIONS = 'vacations_requests';
 const OVERTIME = 'overtime_requests';
 const NOTICES = 'notices';
+const BANK_REQUESTS = 'bank_change_requests';
 const ADMIN_ROLES = ['admin', 'rh'];
 const DECIDED = ['aprobada', 'rechazada'];
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -55,7 +58,7 @@ exports.vacationDecided = onDocumentUpdated(`${VACATIONS}/{id}`, async (event) =
   await send([r.uid], {
     tag: `${VACATIONS}-${event.params.id}-${r.estado}`,
     title: `Sus vacaciones fueron ${r.estado === 'aprobada' ? 'aprobadas' : 'rechazadas'}`,
-    body: `Vacaciones ${vacationDates(r)}.`,
+    body: `Vacaciones ${vacationDates(r)}.${reasonText(r)}`,
     url: '/tabs/solicitudes',
   });
 });
@@ -66,7 +69,7 @@ exports.overtimeDecided = onDocumentUpdated(`${OVERTIME}/{id}`, async (event) =>
   await send([r.uid], {
     tag: `${OVERTIME}-${event.params.id}-${r.estado}`,
     title: `Sus horas extra fueron ${r.estado === 'aprobada' ? 'aprobadas' : 'rechazadas'}`,
-    body: `Horas extra ${overtimeTime(r)}.`,
+    body: `Horas extra ${overtimeTime(r)}.${reasonText(r)}`,
     url: '/tabs/solicitudes',
   });
 });
@@ -98,6 +101,29 @@ exports.overtimeCancelled = onDocumentUpdated(`${OVERTIME}/{id}`, async (event) 
     title: 'Horas extra canceladas',
     body: `${who(r)} canceló sus horas extra ${overtimeTime(r)}${wasApproved ? ' (estaban aprobadas).' : '.'}`,
     url: '/tabs/dashboard',
+  });
+});
+
+exports.newBankChangeRequest = onDocumentCreated(`${BANK_REQUESTS}/{id}`, async (event) => {
+  const r = event.data?.data();
+  if (!r) return;
+  await send(await uidsWithRole(ADMIN_ROLES), {
+    tag: `${BANK_REQUESTS}-${event.params.id}`,
+    title: 'Solicitud de cambio de cuenta',
+    body: `${r.nombre || 'Un trabajador'} pidió cambiar su cuenta de pago.${r.nota ? ` Nota: ${r.nota}` : ''}`,
+    url: '/tabs/dashboard',
+  });
+});
+
+exports.bankAccountChanged = onDocumentWritten('colaboradores/{uid}/privado/pago', async (event) => {
+  const before = event.data?.before.data()?.iban;
+  const after = event.data?.after.data()?.iban;
+  if (!after || before === after) return;
+  await send([event.params.uid], {
+    tag: `bank-${String(after).slice(-4)}`,
+    title: 'Se cambió su cuenta de pago',
+    body: `Ahora termina en ${String(after).slice(-4)}. Si no fue usted quien lo pidió, avise a RH de inmediato.`,
+    url: '/tabs/perfil',
   });
 });
 
@@ -158,6 +184,11 @@ async function send(uids, message) {
     .filter(Boolean);
   await Promise.all(dead.map((ref) => ref.delete()));
   logger.info(`Push "${message.title}": ${result.successCount} sent, ${result.failureCount} failed.`);
+}
+
+function reasonText(r) {
+  const motivo = r.decision?.motivo;
+  return r.estado === 'rechazada' && typeof motivo === 'string' && motivo ? ` Motivo: ${motivo}` : '';
 }
 
 function who(r) {

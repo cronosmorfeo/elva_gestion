@@ -33,6 +33,7 @@ export interface RequestRow {
   month: string; // YYYY-MM of the vacation or overtime date (not of when it was sent)
   start: string; // YYYY-MM-DD (vacations) or YYYY-MM-DDTHH:mm (overtime), to know if it can still be cancelled
   returnDays: number; // days that go back to the balance if an approved vacation is cancelled
+  reason: string; // why it was rejected, written by the admin
 }
 
 export interface MonthOption {
@@ -107,6 +108,7 @@ export function vacationRows(list: VacationRequest[], ownerId: string): RequestR
         month: r.start.slice(0, 7),
         start: r.start,
         returnDays: r.status === 'aprobada' ? (r.deductedDays ?? 0) : 0,
+        reason: r.status === 'rechazada' ? (r.reason ?? '') : '',
       };
     });
 }
@@ -130,6 +132,7 @@ export function overtimeRows(list: OvertimeRequest[], ownerId: string): RequestR
       month: r.start.slice(0, 7),
       start: r.start,
       returnDays: 0,
+      reason: r.status === 'rechazada' ? (r.reason ?? '') : '',
     }));
 }
 

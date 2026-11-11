@@ -1,58 +1,63 @@
 {
   "nombre": "Modelo de datos de ELVA Gestión",
-  "version": "1.0 (propuesta)",
-  "fecha": "2026-11-06",
+  "version": "2.0 (lo que la página usa hoy)",
+  "fecha": "2026-11-11",
   "indice": {
     "leerPrimero": "docs/modelo-de-datos.md",
-    "comoBuscar": "En VS Code: Ctrl+Shift+O lista todas las secciones; Ctrl+F busca una palabra (ej. \"reportes\"). En GitHub: tecla t o Ctrl+F.",
+    "comoBuscar": "En VS Code: Ctrl+Shift+O lista las secciones; Ctrl+F busca una palabra. En GitHub: Ctrl+F.",
     "porTema": {
-      "Empleados": ["colecciones.colaboradores", "colecciones.pago_privado", "pantallas.dashboard.empleados"],
+      "Empleados": [
+        "colecciones.colaboradores",
+        "pantallas.dashboard.empleados",
+        "pantallas.dashboard.editarEmpleado",
+        "pantallas.trabajador.perfil"
+      ],
+      "Cuenta de pago": [
+        "colecciones.pago_privado",
+        "colecciones.bank_change_requests",
+        "pantallas.dashboard.cambiosDeCuenta",
+        "pantallas.trabajador.perfil"
+      ],
       "Vacaciones": [
-        "colecciones.solicitudes_vacaciones",
+        "colecciones.vacations_requests",
         "pantallas.dashboard.aprobarVacaciones",
-        "pantallas.dashboard.vacacionesEstaSemana",
-        "pantallas.trabajador.vacaciones"
+        "pantallas.trabajador.vacaciones",
+        "pantallas.trabajador.misSolicitudes"
       ],
       "Horas extra": [
-        "colecciones.solicitudes_horas",
+        "colecciones.overtime_requests",
         "pantallas.dashboard.horasExtra",
         "pantallas.trabajador.horasExtra"
       ],
-      "Mis solicitudes": ["pantallas.trabajador.misSolicitudes"],
-      "Pagos": ["colecciones.pagos", "pantallas.dashboard.pagos"],
-      "Reportes": ["colecciones.reportes", "pantallas.dashboard.reportes", "pantallas.trabajador.miReporte"],
-      "Avisos": ["colecciones.avisos", "pantallas.dashboard.avisos", "pantallas.trabajador.avisos"],
-      "Actividad": ["colecciones.actividad", "pantallas.dashboard.actividad"],
-      "Resumen y feriados": ["pantallas.dashboard.resumen", "pantallas.dashboard.feriados", "calculadosSinGuardar"],
-      "Notificaciones push": ["colecciones.tokens_push"],
-      "Permisos": ["reglasFirestore"]
+      "Avisos": ["colecciones.notices", "pantallas.dashboard.avisos", "pantallas.trabajador.avisos"],
+      "Reportes": ["colecciones.weekly_reports", "pantallas.dashboard.reportes", "pantallas.trabajador.miReporte"],
+      "Notificaciones": ["colecciones.fcm_tokens", "notificaciones"],
+      "Inicio": ["pantallas.trabajador.inicio"],
+      "Pendiente de hacer": ["todaviaNoEnFirestore", "reglasFirestore"]
     }
   },
   "convenciones": {
-    "sinDuplicados": "Cada dato se guarda en un solo lugar. Las solicitudes, pagos, reportes y avisos guardan solo el uid del empleado; el nombre, correo y saldo se leen de colaboradores/{uid}. Lo que se puede calcular (días descontados, horas, pago por tasa, totales, feriados) no se guarda.",
-    "excepcionesJustificadas": {
-      "pagos.monto": "Se guarda porque es el monto que se debe en ese momento. Si el salario cambia después, el pago viejo no debe cambiar.",
-      "solicitudes.revisionRh / decision": "Historial de quién decidió y cuándo; no existe en otro lugar."
-    },
     "fechaDia": "string \"YYYY-MM-DD\" (sin zona horaria)",
     "fechaHora": "string \"YYYY-MM-DDTHH:mm\", hora de Costa Rica, elegida por la persona",
     "marcaDeTiempo": "Timestamp de Firestore con serverTimestamp(). En los ejemplos se muestra como texto ISO.",
-    "nombresDeTiempo": "Todas las colecciones usan createdAt (creación o envío) y updatedAt (última edición), igual que lo que Tab 3 ya guarda en colaboradores.",
-    "montos": "number entero en la moneda indicada, sin decimales (425000 = ₡425.000)",
-    "estadoSolicitud": ["pendiente", "aprobada", "rechazada"],
+    "estadoSolicitud": ["pendiente", "aprobada", "rechazada", "cancelada"],
+    "sinEstado": "Si una solicitud no tiene 'estado', cuenta como pendiente (las primeras se guardaron sin ese campo).",
+    "decision": "{ por: uid, fecha }. Al aprobar vacaciones agrega diasDescontados; al rechazar agrega motivo.",
     "roles": {
       "regular": "Trabajador",
       "rh": "Recursos Humanos",
       "admin": "Administrador"
     },
-    "rolesDelPanel": ["admin", "rh"]
+    "rolesDelPanel": ["admin", "rh"],
+    "transacciones": "Aprobar vacaciones, rechazar y cancelar usan transacciones de Firestore: si dos personas actúan a la vez, el saldo cambia una sola vez y no se pisa una decisión.",
+    "nombresDeColecciones": "Las colecciones de solicitudes, avisos y reportes están en inglés (como vacations_requests, que creó Andrey); los campos, en español."
   },
   "colecciones": {
     "colaboradores": {
       "ruta": "colaboradores/{uid}",
-      "descripcion": "Un documento por empleado. El id es el uid de Firebase Auth. Es la única fuente del nombre, correo, rol, salario y saldo de vacaciones.",
-      "escribe": "admin/rh (Tab 3 al crear, \"Editar empleado\" al cambiar). Cada empleado puede escribir solo ultimaVisitaAvisos.",
-      "lee": "el mismo empleado y admin/rh",
+      "descripcion": "Un documento por empleado. El id es el uid de Firebase Auth.",
+      "escribe": "Tab 3 al crear; Editar empleado (panel) al cambiar; el saldo cambia también al aprobar o cancelar vacaciones.",
+      "lee": "La propia persona (Mi perfil, saldo) y admin/rh (panel).",
       "campos": {
         "nombre": {
           "tipo": "string",
@@ -62,19 +67,18 @@
         "correo": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Correo de inicio de sesión (igual que en Auth; no se edita)"
+          "descripcion": "Correo de inicio de sesión (no se edita)"
         },
         "tipo_colaborador": {
           "tipo": "string",
-          "requerido": true,
-          "descripcion": "Rol",
+          "requerido": false,
+          "descripcion": "Rol. Tab 3 todavía no lo guarda; si falta, se toma como regular.",
           "valores": ["regular", "rh", "admin"]
         },
         "pais": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Código de país",
-          "valores": ["CR", "PA", "GT", "SV", "HN", "NI", "MX", "US", "CO"]
+          "descripcion": "Código de país (CR, PA, GT...)"
         },
         "fechaIngreso": {
           "tipo": "fechaDia",
@@ -84,7 +88,7 @@
         "salario": {
           "tipo": "number",
           "requerido": true,
-          "descripcion": "Salario mensual en la moneda de \"moneda\""
+          "descripcion": "Salario mensual en la moneda de 'moneda'"
         },
         "moneda": {
           "tipo": "string",
@@ -101,22 +105,22 @@
         "horarioLaborado": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Horario, ej. \"8:00 a. m. - 5:00 p. m.\""
-        },
-        "diasVacaciones": {
-          "tipo": "number",
-          "requerido": false,
-          "descripcion": "NUEVO. Saldo actual de vacaciones. Se resta al aprobar una solicitud (transacción)."
+          "descripcion": "Ej. \"7:00 a. m. - 4:00 p. m.\""
         },
         "activo": {
           "tipo": "boolean",
           "requerido": true,
-          "descripcion": "false = ya no puede iniciar sesión"
+          "descripcion": "false = no puede iniciar sesión"
         },
-        "ultimaVisitaAvisos": {
-          "tipo": "marcaDeTiempo",
+        "vacaciones_disponibles": {
+          "tipo": "number (entero)",
           "requerido": false,
-          "descripcion": "NUEVO. Para contar los avisos nuevos del navbar."
+          "descripcion": "Saldo de vacaciones en días. Lo pone admin/rh en Editar empleado; se resta al aprobar y se devuelve al cancelar. Sin este campo, la persona no puede pedir vacaciones."
+        },
+        "uid": {
+          "tipo": "string",
+          "requerido": false,
+          "descripcion": "Copia del id; Tab 3 lo guarda pero sobra"
         },
         "createdAt": {
           "tipo": "marcaDeTiempo",
@@ -129,7 +133,6 @@
           "descripcion": "Última edición"
         }
       },
-      "notas": "Hoy Tab 3 también guarda \"uid\" dentro del documento; sobra porque ya es el id del documento.",
       "ejemplo": {
         "nombre": "Ana Solís Rojas",
         "correo": "ana.solis@elva.ai",
@@ -140,28 +143,27 @@
         "moneda": "CRC",
         "jornada": "completa",
         "horarioLaborado": "8:00 a. m. - 5:00 p. m.",
-        "diasVacaciones": 12,
         "activo": true,
-        "ultimaVisitaAvisos": "2026-11-05T09:00:00Z",
+        "vacaciones_disponibles": 12,
         "createdAt": "2026-11-05T15:00:00Z",
-        "updatedAt": "2026-11-06T09:30:00Z"
+        "updatedAt": "2026-11-10T09:30:00Z"
       }
     },
     "pago_privado": {
       "ruta": "colaboradores/{uid}/privado/pago",
-      "descripcion": "Datos bancarios. Aparte para que las reglas solo dejen leerlos a admin/rh.",
-      "escribe": "admin/rh",
-      "lee": "admin/rh",
+      "descripcion": "Cuenta de pago. Aparte del perfil para que las reglas la protejan más. Es la misma que ve el trabajador en Mi perfil y la que se usa para pagar.",
+      "escribe": "Admin/rh en Editar empleado (el trabajador no puede cambiarla; la pide con bank_change_requests).",
+      "lee": "La propia persona (Mi perfil, IBAN tapada hasta 'Mostrar') y admin/rh.",
       "campos": {
         "cedula": {
           "tipo": "string",
-          "requerido": true,
-          "descripcion": "Cédula física (9 dígitos) o DIMEX (11 o 12)"
+          "requerido": false,
+          "descripcion": "Cédula (9 dígitos) o DIMEX (11 o 12)"
         },
         "iban": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "CR + 20 dígitos, validado con mod 97"
+          "descripcion": "CR + 20 dígitos, sin espacios, validado con mod 97"
         },
         "monedaCuenta": {
           "tipo": "string",
@@ -169,100 +171,172 @@
           "descripcion": "Moneda de la cuenta",
           "valores": ["CRC", "USD"]
         },
-        "banco": {
-          "tipo": "string",
-          "requerido": true,
-          "descripcion": "Nombre del banco"
-        },
         "updatedAt": {
           "tipo": "marcaDeTiempo",
           "requerido": true,
           "descripcion": "Última edición"
+        },
+        "updatedBy": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "uid de quien la cambió"
         }
       },
+      "notas": "Cuando cambia la IBAN, al trabajador le llega una notificación (en la página y con la Cloud Function bankAccountChanged).",
       "ejemplo": {
-        "cedula": "1-1234-0567",
+        "cedula": "1-1523-0847",
         "iban": "CR05015202001026284066",
         "monedaCuenta": "CRC",
-        "banco": "Banco Nacional de Costa Rica",
-        "updatedAt": "2026-11-06T09:30:00Z"
+        "updatedAt": "2026-11-11T09:30:00Z",
+        "updatedBy": "uidAdmin"
       }
     },
-    "solicitudes_vacaciones": {
-      "ruta": "solicitudes_vacaciones/{id}",
-      "descripcion": "Una por pedido de vacaciones.",
-      "escribe": "el trabajador crea (estado pendiente); admin/rh cambian estado, revisionRh y decision",
-      "lee": "el dueño (uid) y admin/rh",
+    "bank_change_requests": {
+      "ruta": "bank_change_requests/{id}",
+      "descripcion": "El trabajador pide cambiar su cuenta. La cuenta nueva se confirma por Slack; nunca se escribe aquí.",
+      "escribe": "El trabajador crea (Mi perfil); admin/rh la marcan atendida.",
+      "lee": "El dueño y admin/rh.",
       "campos": {
         "uid": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Quién la pidió → colaboradores/{uid}"
+          "descripcion": "Quién la pidió"
         },
-        "inicio": {
-          "tipo": "fechaDia",
+        "nombre": {
+          "tipo": "string",
           "requerido": true,
-          "descripcion": "Primer día de vacaciones"
+          "descripcion": "Nombre para mostrar"
         },
-        "reincorporacion": {
-          "tipo": "fechaDia",
-          "requerido": true,
-          "descripcion": "Día en que vuelve a trabajar"
-        },
-        "comentario": {
+        "nota": {
           "tipo": "string",
           "requerido": false,
-          "descripcion": "Nota para RH"
+          "descripcion": "Nota opcional, máx. 200 letras"
         },
         "estado": {
           "tipo": "string",
           "requerido": true,
           "descripcion": "Estado",
-          "valores": ["pendiente", "aprobada", "rechazada"]
+          "valores": ["pendiente", "atendida"]
         },
-        "revisionRh": {
-          "tipo": "map | null",
-          "requerido": true,
-          "descripcion": "{ por: uid, fecha: marcaDeTiempo }. null = falta revisión de RH"
-        },
-        "decision": {
-          "tipo": "map | null",
-          "requerido": true,
-          "descripcion": "{ por: uid, fecha: marcaDeTiempo }. null mientras está pendiente"
-        },
-        "createdAt": {
+        "fecha": {
           "tipo": "marcaDeTiempo",
           "requerido": true,
-          "descripcion": "Cuándo se envió"
+          "descripcion": "Cuándo se pidió"
+        },
+        "atendida": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por: uid, fecha }"
         }
-      },
-      "calculados": {
-        "diasDescontados": "vacationDays() con inicio, reincorporacion y los feriados"
       },
       "ejemplo": {
         "uid": "Kx81fLq2",
-        "inicio": "2026-11-23",
-        "reincorporacion": "2026-11-30",
-        "comentario": "Viaje familiar",
+        "nombre": "Ana Solís Rojas",
+        "nota": "Cambié de banco",
         "estado": "pendiente",
-        "revisionRh": {
-          "por": "uidRh",
-          "fecha": "2026-11-06T10:00:00Z"
-        },
-        "decision": null,
-        "createdAt": "2026-11-05T14:55:00Z"
+        "fecha": "2026-11-11T09:00:00Z"
       }
     },
-    "solicitudes_horas": {
-      "ruta": "solicitudes_horas/{id}",
-      "descripcion": "Una por pedido de horas extra (antes de trabajarlas).",
-      "escribe": "el trabajador crea; admin/rh cambian estado, revisionRh y decision",
-      "lee": "el dueño (uid) y admin/rh",
+    "vacations_requests": {
+      "ruta": "vacations_requests/{id}",
+      "descripcion": "Una por pedido de vacaciones. Colección creada por Andrey.",
+      "escribe": "El trabajador crea (página Vacaciones) y puede cancelar; admin/rh aprueban o rechazan.",
+      "lee": "El dueño (where uid == yo) y admin/rh.",
       "campos": {
         "uid": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Quién la pidió → colaboradores/{uid}"
+          "descripcion": "Quién la pidió (las primeras no lo tienen)"
+        },
+        "nombreSolicitante": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Nombre para mostrar"
+        },
+        "correoSolicitante": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Correo; sirve para encontrar al empleado si falta uid"
+        },
+        "diaInicio": {
+          "tipo": "fechaDia",
+          "requerido": true,
+          "descripcion": "Primer día de vacaciones"
+        },
+        "diaFin": {
+          "tipo": "fechaDia",
+          "requerido": true,
+          "descripcion": "Día de reincorporación (vuelve a trabajar)"
+        },
+        "diasSolicitados": {
+          "tipo": "number",
+          "requerido": true,
+          "descripcion": "Días hábiles que se descuentan, calculados al pedir"
+        },
+        "comentarioRRHH": {
+          "tipo": "string",
+          "requerido": false,
+          "descripcion": "Nota para RH"
+        },
+        "fechaSolicitud": {
+          "tipo": "marcaDeTiempo",
+          "requerido": true,
+          "descripcion": "Cuándo se envió"
+        },
+        "estado": {
+          "tipo": "string",
+          "requerido": false,
+          "descripcion": "Estado (sin campo = pendiente)",
+          "valores": ["pendiente", "aprobada", "rechazada", "cancelada"]
+        },
+        "decision": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por, fecha, diasDescontados } al aprobar; { por, fecha, motivo } al rechazar"
+        },
+        "cancelacion": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por, fecha, estabaAprobada, diasDevueltos }"
+        }
+      },
+      "ejemplo": {
+        "uid": "Kx81fLq2",
+        "nombreSolicitante": "Ana Solís Rojas",
+        "correoSolicitante": "ana.solis@elva.ai",
+        "diaInicio": "2026-11-23",
+        "diaFin": "2026-11-30",
+        "diasSolicitados": 5,
+        "comentarioRRHH": "Viaje familiar",
+        "fechaSolicitud": "2026-11-10T10:55:00Z",
+        "estado": "aprobada",
+        "decision": {
+          "por": "uidAdmin",
+          "fecha": "2026-11-10T14:00:00Z",
+          "diasDescontados": 5
+        }
+      }
+    },
+    "overtime_requests": {
+      "ruta": "overtime_requests/{id}",
+      "descripcion": "Una por pedido de horas extra (antes de trabajarlas).",
+      "escribe": "El trabajador crea y puede cancelar; admin/rh aprueban o rechazan.",
+      "lee": "El dueño y admin/rh.",
+      "campos": {
+        "uid": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Quién la pidió"
+        },
+        "nombreSolicitante": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Nombre para mostrar"
+        },
+        "correoSolicitante": {
+          "tipo": "string",
+          "requerido": false,
+          "descripcion": "Correo"
         },
         "inicio": {
           "tipo": "fechaHora",
@@ -283,112 +357,103 @@
           "tipo": "string",
           "requerido": true,
           "descripcion": "Estado",
-          "valores": ["pendiente", "aprobada", "rechazada"]
+          "valores": ["pendiente", "aprobada", "rechazada", "cancelada"]
         },
-        "revisionRh": {
-          "tipo": "map | null",
-          "requerido": true,
-          "descripcion": "{ por, fecha } o null"
-        },
-        "decision": {
-          "tipo": "map | null",
-          "requerido": true,
-          "descripcion": "{ por, fecha } o null"
-        },
-        "createdAt": {
+        "fechaSolicitud": {
           "tipo": "marcaDeTiempo",
           "requerido": true,
           "descripcion": "Cuándo se envió"
+        },
+        "decision": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por, fecha } o { por, fecha, motivo } al rechazar"
+        },
+        "cancelacion": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por, fecha, estabaAprobada, diasDevueltos: 0 }"
         }
-      },
-      "calculados": {
-        "minutos": "overtimeMinutes()",
-        "pagoPorTasa": "overtimeDays() / overtimePay(): 1.5x, doble o triple según día y feriado"
       },
       "ejemplo": {
         "uid": "Pm22aQ",
-        "inicio": "2026-11-08T08:00",
-        "fin": "2026-11-08T18:00",
+        "nombreSolicitante": "Luis Mora",
+        "correoSolicitante": "luis@elva.ai",
+        "inicio": "2026-11-14T08:00",
+        "fin": "2026-11-14T12:00",
         "tarea": "Migración del servidor de correo",
         "estado": "pendiente",
-        "revisionRh": {
-          "por": "uidRh",
-          "fecha": "2026-11-06T10:00:00Z"
-        },
-        "decision": null,
-        "createdAt": "2026-11-05T16:10:00Z"
+        "fechaSolicitud": "2026-11-10T16:10:00Z"
       }
     },
-    "pagos": {
-      "ruta": "pagos/{id}",
-      "descripcion": "Lo que hay que pagar: salario de quincena u horas extra aprobadas.",
-      "escribe": "admin/rh o una Cloud Function (cada quincena y al aprobar horas extra)",
-      "lee": "admin/rh",
+    "notices": {
+      "ruta": "notices/{id}",
+      "descripcion": "Avisos de la administración para todos.",
+      "escribe": "Admin/rh (crear, editar, borrar).",
+      "lee": "Cualquiera con sesión.",
       "campos": {
-        "uid": {
+        "titulo": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "A quién → colaboradores/{uid} y su privado/pago"
+          "descripcion": "Máx. 80 letras"
         },
-        "tipo": {
+        "mensaje": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Qué se paga",
-          "valores": ["salario", "horas"]
+          "descripcion": "Máx. 600 letras"
         },
-        "periodo": {
+        "importante": {
+          "tipo": "boolean",
+          "requerido": true,
+          "descripcion": "Sale arriba y resaltado"
+        },
+        "autor": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Año-mes-quincena, ej. \"2026-11-Q1\" (Q1 = del 1 al 15, Q2 = del 16 al fin de mes)"
+          "descripcion": "Nombre de quien lo publicó"
         },
-        "monto": {
-          "tipo": "number",
-          "requerido": true,
-          "descripcion": "Monto a pagar (se guarda a propósito, ver excepcionesJustificadas)"
-        },
-        "moneda": {
+        "autorUid": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Moneda del monto",
-          "valores": ["CRC", "USD", "EUR", "MXN", "COP", "PAB"]
-        },
-        "solicitudHorasId": {
-          "tipo": "string | null",
-          "requerido": true,
-          "descripcion": "Si tipo = horas → solicitudes_horas/{id}"
-        },
-        "pago": {
-          "tipo": "map | null",
-          "requerido": true,
-          "descripcion": "{ comprobante, por: uid, fecha }. null = pendiente"
+          "descripcion": "uid de quien lo publicó"
         },
         "createdAt": {
           "tipo": "marcaDeTiempo",
           "requerido": true,
-          "descripcion": "Creación"
+          "descripcion": "Publicación"
+        },
+        "updatedAt": {
+          "tipo": "marcaDeTiempo | null",
+          "requerido": true,
+          "descripcion": "Última edición"
         }
       },
+      "notas": "Los avisos vistos se guardan en el navegador (localStorage 'elva.avisosVistos.<uid>'), no en Firestore.",
       "ejemplo": {
-        "uid": "Kx81fLq2",
-        "tipo": "salario",
-        "periodo": "2026-11-Q1",
-        "monto": 425000,
-        "moneda": "CRC",
-        "solicitudHorasId": null,
-        "pago": null,
-        "createdAt": "2026-11-13T08:00:00Z"
+        "titulo": "El 1 de enero sí se trabaja, con pago doble",
+        "mensaje": "Avisen a RH antes del 20 de diciembre si no pueden.",
+        "importante": true,
+        "autor": "Félix",
+        "autorUid": "uidAdmin",
+        "createdAt": "2026-11-05T09:15:00Z",
+        "updatedAt": null
       }
     },
-    "reportes": {
-      "ruta": "reportes/{id}",
-      "descripcion": "Reporte semanal opcional. Los archivos van a Storage en reportes/{uid}/{id}/{archivo} (Storage pide plan Blaze).",
-      "escribe": "el trabajador crea; admin/rh llenan visto",
-      "lee": "el dueño (uid) y admin/rh, nunca compañeros",
+    "weekly_reports": {
+      "ruta": "weekly_reports/{id}",
+      "descripcion": "Reporte semanal opcional. Los archivos todavía no se suben (Storage pide Blaze): solo se guarda su nombre.",
+      "escribe": "El trabajador crea; admin/rh llenan visto.",
+      "lee": "El dueño y admin/rh, nunca compañeros.",
       "campos": {
         "uid": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Quién lo envió → colaboradores/{uid}"
+          "descripcion": "Quién lo envió"
+        },
+        "nombre": {
+          "tipo": "string",
+          "requerido": true,
+          "descripcion": "Nombre para mostrar"
         },
         "semana": {
           "tipo": "fechaDia",
@@ -398,19 +463,19 @@
         "texto": {
           "tipo": "string",
           "requerido": false,
-          "descripcion": "Qué hizo (puede ir vacío si hay archivos)"
+          "descripcion": "Qué hizo"
         },
         "archivos": {
-          "tipo": "array<string>",
+          "tipo": "array<{ nombre, tamano, tipo }>",
           "requerido": false,
-          "descripcion": "Rutas en Storage. Nombre, tamaño y tipo salen de la metadata de Storage."
+          "descripcion": "Datos de los archivos adjuntos (no el archivo)"
         },
         "visto": {
           "tipo": "map | null",
           "requerido": true,
-          "descripcion": "{ por: uid, fecha }. null = Nuevo"
+          "descripcion": "{ por, fecha }; null = sin ver"
         },
-        "createdAt": {
+        "fechaEnvio": {
           "tipo": "marcaDeTiempo",
           "requerido": true,
           "descripcion": "Cuándo se envió"
@@ -418,286 +483,172 @@
       },
       "ejemplo": {
         "uid": "Kx81fLq2",
-        "semana": "2026-11-02",
-        "texto": "Terminé la conciliación de facturas de octubre.",
-        "archivos": ["reportes/Kx81fLq2/r1/conciliacion-octubre.xlsx"],
+        "nombre": "Ana Solís Rojas",
+        "semana": "2026-11-09",
+        "texto": "Terminé la conciliación de facturas.",
+        "archivos": [
+          {
+            "nombre": "conciliacion.xlsx",
+            "tamano": 48213,
+            "tipo": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          }
+        ],
         "visto": null,
-        "createdAt": "2026-11-06T16:40:00Z"
+        "fechaEnvio": "2026-11-13T16:40:00Z"
       }
     },
-    "avisos": {
-      "ruta": "avisos/{id}",
-      "descripcion": "Avisos de la administración para todos.",
-      "escribe": "admin/rh (crear, editar, borrar)",
-      "lee": "cualquiera con sesión",
+    "fcm_tokens": {
+      "ruta": "users/{uid}/fcmTokens/{token}",
+      "descripcion": "Un documento por navegador donde la persona activó las notificaciones. Lo usan las Cloud Functions para el push con la página cerrada.",
+      "escribe": "La propia persona (al tocar Activar notificaciones); se borra al cerrar sesión.",
+      "lee": "Cloud Functions.",
       "campos": {
-        "titulo": {
-          "tipo": "string",
-          "requerido": true,
-          "descripcion": "Máximo 80 caracteres"
-        },
-        "mensaje": {
-          "tipo": "string",
-          "requerido": true,
-          "descripcion": "Máximo 600 caracteres"
-        },
-        "importante": {
-          "tipo": "boolean",
-          "requerido": true,
-          "descripcion": "Sale arriba y resaltado"
-        },
-        "autorUid": {
-          "tipo": "string",
-          "requerido": true,
-          "descripcion": "Quién lo publicó → colaboradores/{uid}"
-        },
         "createdAt": {
           "tipo": "marcaDeTiempo",
           "requerido": true,
-          "descripcion": "Publicación"
+          "descripcion": "Cuándo se activó"
         },
-        "updatedAt": {
-          "tipo": "marcaDeTiempo | null",
-          "requerido": false,
-          "descripcion": "Última edición"
-        }
-      },
-      "ejemplo": {
-        "titulo": "El 1 de enero sí se trabaja, con pago doble",
-        "mensaje": "Se trabaja normal y se paga doble. Avisen a RH antes del 20 de diciembre si no pueden.",
-        "importante": true,
-        "autorUid": "uidAdmin",
-        "createdAt": "2026-11-05T09:15:00Z",
-        "updatedAt": null
-      }
-    },
-    "actividad": {
-      "ruta": "actividad/{id}",
-      "descripcion": "Bitácora de acciones de admins. Solo se crea; nunca se edita ni se borra.",
-      "escribe": "admin/rh (solo crear)",
-      "lee": "admin/rh",
-      "campos": {
-        "tipo": {
+        "userAgent": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Acción",
-          "valores": [
-            "aprobar",
-            "rechazar",
-            "pagar",
-            "ver_iban",
-            "editar_empleado",
-            "aviso_publicado",
-            "aviso_editado",
-            "aviso_borrado",
-            "reporte_visto"
-          ]
-        },
-        "porUid": {
-          "tipo": "string",
-          "requerido": true,
-          "descripcion": "Quién lo hizo → colaboradores/{uid}"
-        },
-        "sobre": {
-          "tipo": "string",
-          "requerido": true,
-          "descripcion": "Ruta del documento afectado, ej. \"solicitudes_vacaciones/abc\""
-        },
-        "fecha": {
-          "tipo": "marcaDeTiempo",
-          "requerido": true,
-          "descripcion": "Cuándo"
+          "descripcion": "Navegador (máx. 200 letras)"
         }
-      },
-      "calculados": {
-        "texto": "El frontend arma la frase (\"Paula Méndez vio la cuenta de Ana Solís\") con tipo, porUid y sobre"
-      },
-      "ejemplo": {
-        "tipo": "ver_iban",
-        "porUid": "uidAdmin",
-        "sobre": "colaboradores/Kx81fLq2",
-        "fecha": "2026-11-06T10:05:00Z"
-      }
-    },
-    "tokens_push": {
-      "ruta": "tokens_push/{uid}",
-      "descripcion": "Tokens de notificaciones de cada admin/rh. Los usa una Cloud Function (plan Blaze) para avisar de solicitudes y reportes nuevos.",
-      "escribe": "el mismo usuario",
-      "lee": "Cloud Function",
-      "campos": {
-        "tokens": {
-          "tipo": "array<string>",
-          "requerido": true,
-          "descripcion": "Tokens FCM de sus navegadores"
-        },
-        "updatedAt": {
-          "tipo": "marcaDeTiempo",
-          "requerido": true,
-          "descripcion": "Última actualización"
-        }
-      },
-      "ejemplo": {
-        "tokens": ["token-fcm..."],
-        "updatedAt": "2026-11-06T09:00:00Z"
       }
     }
+  },
+  "todaviaNoEnFirestore": {
+    "pagos": "Pagos pendientes del panel: datos de ejemplo (admin-sample-data.ts). Se conectan cuando RH pase el Excel de planilla.",
+    "actividad": "Actividad reciente del panel: solo en memoria, se borra al recargar. Propuesta: colección actividad (solo crear).",
+    "revisionRh": "La revisión de RH no existe todavía; toda solicitud cuenta como revisada.",
+    "archivosDeReportes": "Firebase Storage (pide plan Blaze)."
   },
   "calculadosSinGuardar": {
     "feriados": "costaRicaHolidays() en vacation-request/holidays.ts, cualquier año",
     "diasDescontados": "vacationDays(solicitud)",
-    "horasYPago": "overtimeMinutes() y overtimePay()",
-    "resumenDashboard": "conteos y sumas de solicitudes por estado",
-    "totalesPagos": "suma de pagos.monto con pago == null, por tipo",
-    "reportesSinVer": "conteo de reportes con visto == null por uid",
-    "avisosNuevos": "conteo de avisos con createdAt > colaboradores.ultimaVisitaAvisos",
-    "quincena": "quincenaLabel() a partir de periodo"
+    "disponiblesParaPedir": "vacaciones_disponibles − días de solicitudes pendientes (nunca menos de 0)",
+    "horasYPago": "overtimeMinutes() y overtimePay(): 1.5x, doble o triple",
+    "choquesDeVacaciones": "vacationConflicts(): vacaciones aprobadas de otras personas que se cruzan",
+    "antiguedad": "seniority() a partir de fechaIngreso",
+    "resumenDashboard": "conteos por estado"
   },
   "pantallas": {
-    "dashboard.perfil": {
-      "fuente": ["colaboradores/{mi uid}"],
-      "muestra": {
-        "Nombre": "nombre",
-        "Rol": "tipo_colaborador"
-      }
-    },
-    "dashboard.resumen": {
-      "fuente": ["solicitudes_vacaciones", "solicitudes_horas"],
-      "muestra": "calculado: resumenDashboard"
-    },
-    "dashboard.aprobarVacaciones": {
-      "fuente": ["solicitudes_vacaciones", "colaboradores"],
-      "muestra": {
-        "Empleado": "colaboradores/{uid}.nombre",
-        "Saldo": "colaboradores/{uid}.diasVacaciones",
-        "Fechas": "inicio → reincorporacion",
-        "Días": "calculado: diasDescontados",
-        "Revisión RH": "revisionRh != null",
-        "Decisión / pestañas": "estado"
-      },
-      "acciones": {
-        "Aprobar": "estado = aprobada, decision = {por, fecha}, restar diasDescontados a colaboradores/{uid}.diasVacaciones (transacción), crear actividad",
-        "Rechazar": "estado = rechazada, decision = {por, fecha}, crear actividad"
-      }
-    },
-    "dashboard.vacacionesEstaSemana": {
-      "fuente": ["solicitudes_vacaciones (estado == aprobada)", "colaboradores"],
-      "muestra": {
-        "Nombre": "colaboradores/{uid}.nombre",
-        "Hasta": "reincorporacion"
-      }
-    },
-    "dashboard.horasExtra": {
-      "fuente": ["solicitudes_horas", "colaboradores"],
-      "muestra": {
-        "Empleado": "colaboradores/{uid}.nombre",
-        "Cuándo": "inicio, fin",
-        "Horas y pago": "calculado: horasYPago",
-        "Qué va a hacer": "tarea",
-        "Decisión": "estado"
-      },
-      "acciones": {
-        "Aprobar": "estado = aprobada, decision, crear pagos (tipo horas), crear actividad",
-        "Rechazar": "estado = rechazada, decision, crear actividad"
-      }
-    },
-    "dashboard.pagos": {
-      "fuente": ["pagos (pago == null)", "colaboradores", "colaboradores/{uid}/privado/pago"],
-      "muestra": {
-        "Concepto": "tipo + periodo",
-        "Empleado": "colaboradores/{uid}.nombre",
-        "Monto": "monto",
-        "Ventana Pagar": "cedula, banco, iban de privado/pago"
-      },
-      "acciones": {
-        "Mostrar IBAN": "crear actividad tipo ver_iban",
-        "Marcar como pagado": "pago = {comprobante, por, fecha}, crear actividad"
-      }
-    },
-    "dashboard.empleados": {
-      "fuente": ["colaboradores", "reportes"],
-      "muestra": {
-        "Empleado": "nombre, correo",
-        "Tipo": "tipo_colaborador",
-        "Jornada": "jornada",
-        "Ingreso": "fechaIngreso",
-        "Estado": "activo",
-        "Reportes": "calculado: reportesSinVer"
-      },
-      "acciones": {
-        "Editar": "actualizar colaboradores/{uid} y privado/pago, crear actividad"
-      }
-    },
-    "dashboard.reportes": {
-      "fuente": ["reportes (por uid)", "Storage"],
-      "muestra": {
-        "Semana": "semana",
-        "Enviado": "createdAt",
-        "Texto": "texto",
-        "Archivos": "archivos + metadata de Storage",
-        "Nuevo/Visto": "visto"
-      },
-      "acciones": {
-        "Marcar como visto": "visto = {por, fecha}, crear actividad"
-      }
-    },
-    "dashboard.avisos": {
-      "fuente": ["avisos", "colaboradores (autor)"],
-      "acciones": {
-        "Nuevo / Editar / Borrar": "escribir avisos, crear actividad"
-      }
-    },
-    "dashboard.actividad": {
-      "fuente": ["actividad (últimas 8)", "colaboradores"],
-      "muestra": "calculado: texto"
-    },
-    "dashboard.feriados": {
-      "fuente": [],
-      "muestra": "calculado: feriados"
+    "trabajador.inicio": {
+      "fuente": [
+        "colaboradores/{yo}",
+        "vacations_requests (uid == yo)",
+        "overtime_requests (uid == yo)",
+        "notices",
+        "weekly_reports (uid == yo)"
+      ],
+      "muestra": "saldo disponible, solicitudes pendientes, avisos nuevos, reporte de la semana y próximas fechas (vacaciones/horas aprobadas y feriados)"
     },
     "trabajador.vacaciones": {
-      "fuente": ["colaboradores/{mi uid}.diasVacaciones"],
-      "escribe": "solicitudes_vacaciones"
+      "fuente": ["colaboradores/{yo}.vacaciones_disponibles", "vacations_requests pendientes (uid == yo)"],
+      "escribe": "vacations_requests"
     },
     "trabajador.horasExtra": {
       "fuente": [],
-      "escribe": "solicitudes_horas"
+      "escribe": "overtime_requests"
     },
     "trabajador.misSolicitudes": {
-      "fuente": ["solicitudes_vacaciones (uid == yo)", "solicitudes_horas (uid == yo)"]
+      "fuente": ["vacations_requests (uid == yo)", "overtime_requests (uid == yo)"],
+      "muestra": "estado, motivo del rechazo, filtro por mes",
+      "escribe": "estado = cancelada y cancelacion; devuelve diasDescontados a colaboradores/{yo}.vacaciones_disponibles"
     },
     "trabajador.avisos": {
-      "fuente": ["avisos", "colaboradores (autor)"],
-      "escribe": "colaboradores/{mi uid}.ultimaVisitaAvisos"
+      "fuente": ["notices"]
     },
     "trabajador.miReporte": {
-      "fuente": ["reportes (uid == yo)"],
-      "escribe": "reportes + Storage"
+      "fuente": ["weekly_reports (uid == yo)"],
+      "escribe": "weekly_reports"
+    },
+    "trabajador.perfil": {
+      "fuente": ["colaboradores/{yo}", "colaboradores/{yo}/privado/pago", "bank_change_requests (uid == yo)"],
+      "escribe": "bank_change_requests"
+    },
+    "dashboard.resumen": {
+      "fuente": ["vacations_requests", "overtime_requests"]
+    },
+    "dashboard.aprobarVacaciones": {
+      "fuente": ["vacations_requests", "colaboradores (saldo)"],
+      "acciones": {
+        "Aprobar": "transacción: estado = aprobada, decision con diasDescontados, resta el saldo (no aprueba si no alcanza)",
+        "Rechazar": "transacción: estado = rechazada, decision con motivo (obligatorio)"
+      },
+      "muestra": "buscar por nombre/correo, filtro por mes, pestañas por estado, aviso de choques"
+    },
+    "dashboard.horasExtra": {
+      "fuente": ["overtime_requests"],
+      "acciones": {
+        "Aprobar": "estado = aprobada, decision",
+        "Rechazar": "transacción con motivo"
+      }
+    },
+    "dashboard.cambiosDeCuenta": {
+      "fuente": ["bank_change_requests (estado == pendiente)"],
+      "acciones": {
+        "Editar cuenta": "abre Editar empleado",
+        "Marcar como atendida": "estado = atendida, atendida = { por, fecha }"
+      }
+    },
+    "dashboard.empleados": {
+      "fuente": ["colaboradores", "weekly_reports"]
+    },
+    "dashboard.editarEmpleado": {
+      "fuente": ["colaboradores/{uid}", "colaboradores/{uid}/privado/pago"],
+      "escribe": "colaboradores/{uid} (incluye vacaciones_disponibles) y, si cambió, privado/pago"
+    },
+    "dashboard.reportes": {
+      "fuente": ["weekly_reports"],
+      "acciones": {
+        "Marcar como visto": "visto = { por, fecha }"
+      }
+    },
+    "dashboard.avisos": {
+      "fuente": ["notices"],
+      "acciones": {
+        "Nuevo / Editar / Borrar": "escribe notices"
+      }
+    },
+    "dashboard.pagos": {
+      "fuente": ["datos de ejemplo"]
+    },
+    "dashboard.actividad": {
+      "fuente": ["memoria (se borra al recargar)"]
     }
   },
+  "notificaciones": {
+    "admin": "solicitud nueva o cancelada de vacaciones/horas extra; pedido de cambio de cuenta",
+    "trabajador": "su solicitud fue aprobada o rechazada (con motivo); aviso nuevo; su cuenta de pago cambió",
+    "comoLlegan": "Con la página abierta: la muestra la propia página. Con la página cerrada: Cloud Functions en functions/ (no desplegadas, necesitan Blaze)."
+  },
   "reglasFirestore": {
+    "estadoActual": "ABIERTAS: allow read, write: if true. Hay que cambiarlas antes de usar datos reales.",
     "rolAdmin": "get(colaboradores/{request.auth.uid}).tipo_colaborador in ['admin','rh'] && activo == true",
-    "colaboradores": "lee dueño o admin; escribe admin; el dueño solo puede cambiar ultimaVisitaAvisos; nadie cambia su propio tipo_colaborador ni activo",
-    "privado/pago": "solo admin",
-    "solicitudes_*": "crea el dueño con uid == request.auth.uid, estado == pendiente, revisionRh == null, decision == null; lee dueño o admin; actualiza solo admin",
-    "reportes": "crea el dueño con visto == null; lee dueño o admin; actualiza visto solo admin",
-    "pagos": "solo admin",
-    "actividad": "crea y lee admin; nadie edita ni borra",
-    "avisos": "lee cualquiera con sesión; escribe admin",
-    "tokens_push": "cada usuario escribe el suyo"
+    "colaboradores": "lee el dueño o admin; escribe admin; nadie cambia su propio tipo_colaborador, activo ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
+    "privado/pago": "lee el dueño o admin; escribe admin, nunca sobre su propia cuenta",
+    "bank_change_requests": "crea el dueño con estado pendiente; lee el dueño o admin; actualiza admin",
+    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin decide",
+    "devolucionDeDias": "Hoy el navegador del trabajador devuelve los días al cancelar. La regla solo debe permitir sumar decision.diasDescontados de esa solicitud, o hacerlo en una Cloud Function.",
+    "weekly_reports": "crea el dueño con visto == null; lee dueño o admin; admin cambia visto",
+    "notices": "lee cualquiera con sesión; escribe admin",
+    "users/{uid}/fcmTokens": "cada usuario escribe y borra solo los suyos"
   },
   "nombresFrontendAFirestore": {
-    "employee": "(se lee de colaboradores con uid)",
     "ownerId": "uid",
-    "start/returnDate": "inicio/reincorporacion",
+    "employee": "nombreSolicitante",
+    "email": "correoSolicitante",
+    "start/returnDate (vacaciones)": "diaInicio/diaFin",
     "start/end (horas)": "inicio/fin",
     "task": "tarea",
-    "comment": "comentario",
-    "balance": "colaboradores.diasVacaciones",
-    "rhReviewed": "revisionRh != null",
+    "comment": "comentarioRRHH",
     "status": "estado",
-    "sentAt": "createdAt",
-    "Notice.title/message/important": "titulo/mensaje/importante",
-    "Notice.author": "autorUid",
-    "Notice.createdAt/updatedAt": "createdAt/updatedAt"
+    "sentAt": "fechaSolicitud",
+    "deductedDays": "decision.diasDescontados",
+    "reason": "decision.motivo",
+    "balance": "colaboradores.vacaciones_disponibles",
+    "Notice.title/message/important/author": "titulo/mensaje/importante/autor",
+    "WorkReport.weekStart/text/files/seen": "semana/texto/archivos/visto",
+    "BankAccount.cedula/iban/currency": "cedula/iban/monedaCuenta"
   }
 }

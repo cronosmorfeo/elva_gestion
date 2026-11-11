@@ -101,6 +101,25 @@
                 }
               </div>
             </div>
+            <div class="req-filters">
+              <label class="sr-only" for="vac-buscar">Buscar en vacaciones</label>
+              <input
+                id="vac-buscar"
+                type="search"
+                placeholder="Buscar por nombre o correo"
+                [value]="vacSearch()"
+                (input)="setRequestFilter('vacSearch', $event)"
+              />
+              <label class="sr-only" for="vac-mes">Mes</label>
+              <select id="vac-mes" [value]="vacMonth()" (change)="setRequestFilter('vacMonth', $event)">
+                @for (m of vacMonths(); track m.value) {
+                <option [value]="m.value" [selected]="m.value === vacMonth()">{{ m.label }}</option>
+                }
+              </select>
+              @if (vacFiltered()) {
+              <button type="button" class="btn ghost" (click)="clearRequestFilter('vac')">Limpiar</button>
+              }
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -118,6 +137,9 @@
                     <td>
                       <strong>{{ row.employee }}</strong>
                       <span class="muted">Saldo: {{ row.balance }}</span>
+                      @if (row.conflicts) {
+                      <span class="conflict">Choca con: {{ row.conflicts }}</span>
+                      }
                     </td>
                     <td>{{ row.start }} <span class="muted inline">→ vuelve</span> {{ row.returnDate }}</td>
                     <td class="num">{{ row.days }}</td>
@@ -142,9 +164,13 @@
                       <span class="muted inline">Espera a RH</span>
                       } @else if (row.status === 'aprobada') {
                       <span class="chip ok">Aprobada</span>
+                      } @else if (row.status === 'cancelada') {
+                      <span class="chip off">Cancelada</span>
                       } @else {
                       <span class="chip rejected">Rechazada</span>
-                      }
+                      @if (row.reason) {
+                      <span class="muted reason">Motivo: {{ row.reason }}</span>
+                      } }
                     </td>
                   </tr>
                   } @empty {
@@ -172,6 +198,25 @@
                 </button>
                 }
               </div>
+            </div>
+            <div class="req-filters">
+              <label class="sr-only" for="ot-buscar">Buscar en horas extra</label>
+              <input
+                id="ot-buscar"
+                type="search"
+                placeholder="Buscar por nombre o correo"
+                [value]="otSearch()"
+                (input)="setRequestFilter('otSearch', $event)"
+              />
+              <label class="sr-only" for="ot-mes">Mes</label>
+              <select id="ot-mes" [value]="otMonth()" (change)="setRequestFilter('otMonth', $event)">
+                @for (m of otMonths(); track m.value) {
+                <option [value]="m.value" [selected]="m.value === otMonth()">{{ m.label }}</option>
+                }
+              </select>
+              @if (otFiltered()) {
+              <button type="button" class="btn ghost" (click)="clearRequestFilter('ot')">Limpiar</button>
+              }
             </div>
             <div class="table-wrap">
               <table>
@@ -211,9 +256,13 @@
                       <span class="muted inline">Espera a RH</span>
                       } @else if (row.status === 'aprobada') {
                       <span class="chip ok">Aprobada</span>
+                      } @else if (row.status === 'cancelada') {
+                      <span class="chip off">Cancelada</span>
                       } @else {
                       <span class="chip rejected">Rechazada</span>
-                      }
+                      @if (row.reason) {
+                      <span class="muted reason">Motivo: {{ row.reason }}</span>
+                      } }
                     </td>
                   </tr>
                   } @empty {
@@ -225,6 +274,37 @@
               </table>
             </div>
           </section>
+
+          @if (bankRequests().length) {
+          <section class="card bank-requests" aria-labelledby="t-bank">
+            <div class="card-head">
+              <h2 id="t-bank">Cambios de cuenta solicitados</h2>
+            </div>
+            <p class="muted">
+              Confirmá la cuenta nueva con la persona por Slack, revisá en la app del banco que el titular sea ella y
+              cambiala en Editar empleado.
+            </p>
+            <ul class="bank-list">
+              @for (r of bankRequests(); track r.id) {
+              <li>
+                <div>
+                  <strong>{{ r.employee }}</strong>
+                  <span class="muted">{{ r.sent }}</span>
+                  @if (r.note) {
+                  <span class="muted">Nota: {{ r.note }}</span>
+                  }
+                </div>
+                <div class="actions">
+                  <button type="button" class="btn ghost" (click)="editFromRequest(r.uid)">Editar cuenta</button>
+                  <button type="button" class="btn primary" (click)="resolveBankRequest(r.id, r.employee)">
+                    Marcar como atendida
+                  </button>
+                </div>
+              </li>
+              }
+            </ul>
+          </section>
+          }
 
           <section id="empleados" class="card" aria-labelledby="t-emp">
             <div class="card-head">
@@ -572,6 +652,56 @@
       </div>
     </div>
   </div>
+  } @if (rejecting(); as rj) {
+  <div class="modal-backdrop">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reject-title"
+      tabindex="-1"
+      (keydown.escape)="closeReject()"
+    >
+      <div class="modal-head">
+        <div>
+          <h2 id="reject-title">
+            Rechazar {{ rj.kind === 'vacaciones' ? 'vacaciones' : 'horas extra' }} de {{ rj.employee }}
+          </h2>
+          <span class="muted">El trabajador va a ver este motivo en Mis solicitudes.</span>
+        </div>
+        <button type="button" class="icon-btn" aria-label="Cerrar" (click)="closeReject()">✕</button>
+      </div>
+
+      <div class="edit-field">
+        <label for="reject-reason">Motivo</label>
+        <textarea
+          id="reject-reason"
+          rows="3"
+          placeholder="Ej.: Ya hay dos personas del equipo de vacaciones esa semana."
+          [attr.maxlength]="maxReason"
+          [value]="rj.reason"
+          (input)="setRejectReason($event)"
+        ></textarea>
+        <span class="muted">{{ rj.reason.length }} / {{ maxReason }}</span>
+      </div>
+
+      @if (rejectError() && rj.reason) {
+      <p class="error-text">{{ rejectError() }}</p>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" (click)="closeReject()">Cancelar</button>
+        <button
+          type="button"
+          class="btn danger"
+          [disabled]="!!rejectError() || rejectSaving()"
+          (click)="confirmReject()"
+        >
+          Rechazar
+        </button>
+      </div>
+    </div>
+  </div>
   } @if (noticeForm(); as nf) {
   <div class="modal-backdrop">
     <div
@@ -796,7 +926,18 @@
         </div>
       </div>
 
-      <h3 class="edit-section">Datos de pago <span class="sample">Todavía no se guarda</span></h3>
+      <h3 class="edit-section">
+        Datos de pago @if (f.sample) {
+        <span class="sample">Ejemplo: no se guarda</span>
+        }
+      </h3>
+      @if (editBank() === 'loading') {
+      <p class="muted">Cargando la cuenta guardada…</p>
+      } @else if (editBank() === 'error') {
+      <p class="error-text">No se pudo cargar la cuenta guardada. Cerrá y abrí de nuevo antes de cambiarla.</p>
+      } @else if (editBankUpdated()) {
+      <p class="muted">{{ editBankUpdated() }}. El trabajador ve esta misma cuenta en Mi perfil.</p>
+      }
       <div class="edit-grid">
         <div class="edit-field">
           <label for="edit-cedula">Cédula</label>
@@ -839,7 +980,9 @@
         </div>
       </div>
 
-      @if (editState()?.missing) {
+      @if (editState()?.bankError && editState()?.changed) {
+      <p class="error-text">{{ editState()?.bankError }}</p>
+      } @if (editState()?.missing) {
       <p class="error-text">{{ editState()?.missing }}</p>
       } @if (editError()) {
       <p class="error-text" role="alert">{{ editError() }}</p>

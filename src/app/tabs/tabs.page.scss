@@ -25,11 +25,6 @@ ion-tabs {
   font-weight: 800;
   text-decoration: none;
 
-  &:focus-visible {
-    outline: 2px solid #5ce1e6;
-    outline-offset: 2px;
-  }
-
   img {
     width: 28px;
     height: 28px;
@@ -37,53 +32,55 @@ ion-tabs {
   }
 }
 
+.links,
+.actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
 .links {
   flex: 1;
   min-width: 0;
-  display: flex;
-  gap: 0.25rem;
   overflow-x: auto;
   scrollbar-width: none;
+}
 
-  a {
-    padding: 0.45rem 0.8rem;
-    border-radius: 999px;
-    white-space: nowrap;
-    font-size: 0.9rem;
-    color: #ffffff;
-    text-decoration: none;
-  }
+.links a,
+.mobile-menu a {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: #ffffff;
+  text-decoration: none;
 
-  a:hover {
+  &:hover {
     background: rgba(255, 255, 255, 0.12);
   }
 
-  a.active {
+  &.active {
     background: rgba(255, 255, 255, 0.2);
     font-weight: 700;
   }
+}
 
-  a:focus-visible {
-    outline: 2px solid #5ce1e6;
-  }
-
-  .badge {
-    display: inline-block;
-    min-width: 1.1rem;
-    margin-left: 0.25rem;
-    padding: 0 0.3rem;
-    border-radius: 999px;
-    background: #ffffff;
-    color: #008f82;
-    font-size: 0.72rem;
-    font-weight: 800;
-    line-height: 1.1rem;
-    text-align: center;
-  }
+.badge {
+  display: inline-block;
+  min-width: 1.1rem;
+  margin-left: 0.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #008f82;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1rem;
+  text-align: center;
 }
 
 .notify,
-.logout {
+.logout,
+.menu-btn {
   flex-shrink: 0;
   padding: 0.45rem 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.6);
@@ -99,14 +96,55 @@ ion-tabs {
   &:hover {
     background: rgba(255, 255, 255, 0.12);
   }
+}
 
-  &:focus-visible {
-    outline: 2px solid #5ce1e6;
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid #5ce1e6;
+  outline-offset: 2px;
+}
+
+.menu-btn {
+  display: none;
+  margin-left: auto;
+}
+
+// Small screens: the links open in a finger-sized list under the bar.
+.mobile-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem 0.9rem;
+  background: #008f82;
+
+  a {
+    padding: 0.75rem 0.85rem;
+    border-radius: 10px;
+    font-size: 1rem;
   }
 }
 
-@media (max-width: 600px) {
-  .brand-name {
+.mobile-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+// The full bar needs about 1,150 px; below that, the links move into the menu.
+@media (max-width: 1150px) {
+  .links,
+  .actions {
+    display: none;
+  }
+
+  .menu-btn {
+    display: inline-block;
+  }
+}
+
+@media (min-width: 1151px) {
+  .mobile-menu {
     display: none;
   }
 }

@@ -47,7 +47,7 @@
         } @if (r.reason) {
         <p class="request-reason"><strong>Motivo del rechazo:</strong> {{ r.reason }}</p>
         }
-        <span class="meta">{{ r.sent }}{{ r.sample ? ' · Ejemplo' : '' }}</span>
+        <span class="meta">{{ r.sent }}</span>
         @if (r.cancellable) { @if (confirmCancelId() === r.id) {
         <div class="cancel-confirm" role="alert">
           <span>{{ r.confirmText }}</span>

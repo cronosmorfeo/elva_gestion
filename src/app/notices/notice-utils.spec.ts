@@ -1,5 +1,5 @@
 import type { Notice } from './notice-utils';
-import { localDateTime, noticeProblem, sampleNotices, sortNotices, unseenNotices } from './notice-utils';
+import { noticeProblem, sortNotices, unseenNotices } from './notice-utils';
 
 const notice = (id: string, createdAt: string): Notice => ({
   id,
@@ -31,14 +31,5 @@ describe('notice utils', () => {
     expect(unseenNotices(list, '')).toBe(2);
     expect(unseenNotices(list, '2026-11-02T00:00')).toBe(1);
     expect(unseenNotices(list, '2026-11-05T00:00')).toBe(0);
-  });
-
-  it('has sample notices from the past, one important', () => {
-    const now = localDateTime(new Date());
-    const samples = sampleNotices();
-    expect(samples).toHaveLength(3);
-    expect(samples.every((n) => n.createdAt < now && n.sample === true)).toBe(true);
-    expect(samples.filter((n) => n.important)).toHaveLength(1);
-    expect(localDateTime(new Date(2026, 0, 5, 7, 3))).toBe('2026-01-05T07:03');
   });
 });

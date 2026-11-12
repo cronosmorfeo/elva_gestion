@@ -22,7 +22,6 @@ export interface VacationRequest {
   reason?: string; // why it was rejected (the worker sees it)
   comment?: string;
   sentAt?: string; // YYYY-MM-DDTHH:mm
-  sample?: boolean;
 }
 
 export interface OvertimeRequest {
@@ -37,7 +36,6 @@ export interface OvertimeRequest {
   email?: string;
   reason?: string; // why it was rejected (the worker sees it)
   sentAt?: string;
-  sample?: boolean;
 }
 
 export interface UpcomingHoliday {

@@ -52,7 +52,6 @@ export class WeeklyReportPage {
         week: weekLabel(r.weekStart),
         text: r.text,
         seen: r.seen,
-        sample: false,
         attachments: r.files.map((f) => `${f.name} · ${formatFileSize(f.size)}`),
       })),
   );

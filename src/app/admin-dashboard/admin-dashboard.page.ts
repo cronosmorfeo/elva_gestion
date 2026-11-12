@@ -38,7 +38,7 @@ import {
   msUntilMidnight,
   quincenaLabel,
 } from './admin-dates';
-import type { PendingPayment, RequestStatus, VacationRequest } from './admin-requests';
+import type { Payee, PendingPayment, RequestStatus, VacationRequest } from './admin-requests';
 import {
   formatColones,
   formatHours,
@@ -51,7 +51,6 @@ import {
   upcomingHolidays,
   vacationDays,
 } from './admin-requests';
-import { SAMPLE_EMPLOYEES, SAMPLE_PAYEES, SAMPLE_PAYMENTS } from './admin-sample-data';
 import { MAX_REASON, reasonProblem, vacationConflicts } from './decisions';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
@@ -63,7 +62,6 @@ interface Employee {
   schedule: string;
   startDate: string;
   active: boolean;
-  sample: boolean;
   // Raw values, used by the edit window.
   tipo: string;
   jornada: string;
@@ -77,7 +75,6 @@ interface Employee {
 
 interface EditForm {
   id: string;
-  sample: boolean;
   self: boolean;
   email: string;
   nombre: string;
@@ -173,7 +170,8 @@ export class AdminDashboardPage {
   );
   readonly vacationTab = signal<RequestStatus>('pendiente');
   readonly overtimeTab = signal<RequestStatus>('pendiente');
-  readonly payments = signal<PendingPayment[]>(SAMPLE_PAYMENTS);
+  // TODO: load from Firestore once payroll is defined with HR. Until then the section stays empty.
+  readonly payments = signal<PendingPayment[]>([]);
   readonly activity = signal<{ text: string; time: string }[]>([]);
 
   readonly openPaymentId = signal<string | null>(null);
@@ -182,7 +180,8 @@ export class AdminDashboardPage {
   readonly paymentDetail = computed(() => {
     const payment = this.payments().find((p) => p.id === this.openPaymentId());
     if (!payment) return null;
-    const payee = SAMPLE_PAYEES[payment.employee];
+    // TODO: read the account from colaboradores/{uid}/privado/pago when payments are real.
+    const payee = undefined as Payee | undefined;
     return {
       id: payment.id,
       concept: payment.concept,
@@ -369,7 +368,7 @@ export class AdminDashboardPage {
       schedule: scheduleText(f.horaInicio, f.horaFin),
       hours: scheduleText(f.horaInicio, f.horaFin) ? hoursText(shiftMinutes(f.horaInicio, f.horaFin)) : '',
       cedulaError: Boolean(f.cedula) && !isValidCedula(f.cedula),
-      bankError: f.sample ? '' : bankProblem(f.cedula, f.iban, f.monedaCuenta),
+      bankError: bankProblem(f.cedula, f.iban, f.monedaCuenta),
       ibanComplete: normalizeIban(f.iban).length >= 22,
       ibanValid: isValidCrIban(f.iban),
       missing: missing.length ? `Falta: ${missing.join(', ')}.` : '',
@@ -377,7 +376,8 @@ export class AdminDashboardPage {
       canSave:
         missing.length === 0 &&
         !vacationError &&
-        (f.sample || (this.editBank() === 'ready' && !bankProblem(f.cedula, f.iban, f.monedaCuenta))) &&
+        this.editBank() === 'ready' &&
+        !bankProblem(f.cedula, f.iban, f.monedaCuenta) &&
         changed &&
         !this.editSaving(),
       changed,
@@ -609,7 +609,7 @@ export class AdminDashboardPage {
     this.ibanVisible.set(false);
     await this.log(
       `${this.profileName() || 'Vos'} pagó ${detail.concept.toLowerCase()} a ${detail.name} (${detail.amount}, comprobante ${receipt})`,
-      'Pago registrado. Son datos de ejemplo: todavía no se guarda.',
+      'Pago registrado. Todavía no se guarda en la base de datos.',
     );
   }
 
@@ -650,11 +650,9 @@ export class AdminDashboardPage {
     const e = this.employees().find((x) => x.id === id);
     if (!e) return;
     const times = parseScheduleText(e.horario);
-    const payee = e.sample ? SAMPLE_PAYEES[e.name] : undefined;
     const form: EditForm = {
       id: e.id,
-      sample: e.sample,
-      self: !e.sample && e.id === getAuth().currentUser?.uid,
+      self: e.id === getAuth().currentUser?.uid,
       email: e.email,
       nombre: e.name,
       tipo: e.tipo || 'regular',
@@ -668,15 +666,15 @@ export class AdminDashboardPage {
       horaFin: times?.end ?? '',
       vacaciones: e.vacationBalance === null ? '' : String(e.vacationBalance),
       activo: e.active,
-      cedula: payee?.cedula ?? '',
-      iban: payee ? groupIban(payee.iban) : '',
-      monedaCuenta: payee ? 'CRC' : '',
+      cedula: '',
+      iban: '',
+      monedaCuenta: '',
     };
     this.editing.set(form);
     this.editOriginal.set(JSON.stringify(form));
     this.editError.set('');
     setTimeout(() => document.getElementById('edit-close')?.focus());
-    if (!e.sample) void this.loadEditBank(e.id);
+    void this.loadEditBank(e.id);
   }
 
   // The payment account lives apart (colaboradores/{uid}/privado/pago), so it loads after the window opens.
@@ -804,14 +802,11 @@ export class AdminDashboardPage {
     this.editError.set('');
     let bankChanged = false;
     try {
-      // Sample employees only change on screen.
       const before = JSON.parse(this.editOriginal()) as EditForm;
       bankChanged = before.cedula !== f.cedula || before.iban !== f.iban || before.monedaCuenta !== f.monedaCuenta;
-      if (!f.sample) {
-        await updateDoc(doc(getFirestore(), 'colaboradores', f.id), { ...changes, updatedAt: serverTimestamp() });
-        if (bankChanged) {
-          await this.store.saveBankAccount(f.id, { cedula: f.cedula, iban: f.iban, currency: f.monedaCuenta });
-        }
+      await updateDoc(doc(getFirestore(), 'colaboradores', f.id), { ...changes, updatedAt: serverTimestamp() });
+      if (bankChanged) {
+        await this.store.saveBankAccount(f.id, { cedula: f.cedula, iban: f.iban, currency: f.monedaCuenta });
       }
       this.employees.update((list) =>
         list.map((e) =>
@@ -838,7 +833,7 @@ export class AdminDashboardPage {
       this.editing.set(null);
       await this.log(
         `${this.profileName() || 'Vos'} editó los datos de ${changes.nombre}${bankChanged ? ' (cambió la cuenta de pago)' : ''}`,
-        f.sample ? 'Cambios aplicados. Es un empleado de ejemplo: no se guarda.' : 'Cambios guardados.',
+        'Cambios guardados.',
       );
     } catch {
       this.editError.set('No se pudieron guardar los cambios. Revisá la conexión y probá de nuevo.');
@@ -938,7 +933,6 @@ export class AdminDashboardPage {
           schedule: SCHEDULES[String(data['jornada'])] ?? '—',
           startDate: typeof data['fechaIngreso'] === 'string' ? formatShortDate(data['fechaIngreso']) : '—',
           active: data['activo'] === true,
-          sample: false,
           tipo: typeof data['tipo_colaborador'] === 'string' ? data['tipo_colaborador'] : 'regular',
           jornada: String(data['jornada'] ?? ''),
           horario: String(data['horarioLaborado'] ?? ''),
@@ -949,26 +943,7 @@ export class AdminDashboardPage {
           vacationBalance: typeof data['vacaciones_disponibles'] === 'number' ? data['vacaciones_disponibles'] : null,
         };
       });
-      const samples = SAMPLE_EMPLOYEES.map((e) => ({
-        id: e.id,
-        name: e.name,
-        email: e.email,
-        role: roleLabel(e.tipo),
-        schedule: SCHEDULES[e.jornada] ?? '—',
-        startDate: formatShortDate(e.fechaIngreso),
-        active: e.activo,
-        sample: true,
-        tipo: e.tipo,
-        jornada: e.jornada,
-        horario: e.horario ?? '',
-        fechaIngreso: e.fechaIngreso,
-        salario: e.salario ?? null,
-        moneda: 'CRC',
-        pais: 'CR',
-        vacationBalance: null,
-      }));
-      list.push(...samples);
-      list.sort((a, b) => Number(a.sample) - Number(b.sample) || a.name.localeCompare(b.name, 'es'));
+      list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
       this.employees.set(list);
       this.employeesState.set('ready');
     } catch {
@@ -991,8 +966,9 @@ function balanceText(request: VacationRequest, employees: Employee[]): string {
 
 // The real employee who sent a request: by uid, or by email for requests sent before the uid was saved.
 function ownerOf(request: VacationRequest, employees: Employee[]): Employee | undefined {
-  const real = employees.filter((e) => !e.sample);
-  return real.find((e) => e.id === request.ownerId) ?? real.find((e) => !!e.email && e.email === request.email);
+  return (
+    employees.find((e) => e.id === request.ownerId) ?? employees.find((e) => !!e.email && e.email === request.email)
+  );
 }
 
 // Whole days, from 0 to 365. '' means it was left empty.

@@ -325,15 +325,6 @@ $danger: #8a2420;
     }
   }
 
-  .sample {
-    padding: 3px 10px;
-    border-radius: 99px;
-    background: $warn-bg;
-    color: #8a5a00;
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
   .tabs {
     display: flex;
     flex-wrap: wrap;
@@ -694,15 +685,6 @@ $danger: #8a2420;
   .btn.small {
     padding: 6px 12px;
     font-size: 0.82rem;
-  }
-
-  .chip.sample-chip {
-    margin-left: 6px;
-    padding: 1px 8px;
-    background: $warn-bg;
-    color: #8a5a00;
-    font-size: 0.7rem;
-    vertical-align: middle;
   }
 
   .modal-backdrop {

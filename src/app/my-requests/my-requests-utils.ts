@@ -29,7 +29,6 @@ export interface RequestRow {
   sent: string;
   status: RequestStatus;
   statusText: string;
-  sample: boolean;
   month: string; // YYYY-MM of the vacation or overtime date (not of when it was sent)
   start: string; // YYYY-MM-DD (vacations) or YYYY-MM-DDTHH:mm (overtime), to know if it can still be cancelled
   returnDays: number; // days that go back to the balance if an approved vacation is cancelled
@@ -104,7 +103,6 @@ export function vacationRows(list: VacationRequest[], ownerId: string): RequestR
         sent: sentText(r.sentAt),
         status: r.status,
         statusText: statusText(r.status, r.rhReviewed),
-        sample: r.sample === true,
         month: r.start.slice(0, 7),
         start: r.start,
         returnDays: r.status === 'aprobada' ? (r.deductedDays ?? 0) : 0,
@@ -128,65 +126,9 @@ export function overtimeRows(list: OvertimeRequest[], ownerId: string): RequestR
       sent: sentText(r.sentAt),
       status: r.status,
       statusText: statusText(r.status, r.rhReviewed),
-      sample: r.sample === true,
       month: r.start.slice(0, 7),
       start: r.start,
       returnDays: 0,
       reason: r.status === 'rechazada' ? (r.reason ?? '') : '',
     }));
-}
-
-// A few example requests for a worker who has not sent any yet, so the page is not empty.
-export function exampleRequests(
-  owner: { uid: string; name: string },
-  today: string,
-): { vacations: VacationRequest[]; overtime: OvertimeRequest[] } {
-  const base = { ownerId: owner.uid, employee: owner.name, sample: true };
-  return {
-    vacations: [
-      {
-        ...base,
-        id: `${owner.uid}-ev1`,
-        balance: 12,
-        start: addDays(today, 18),
-        returnDate: addDays(today, 21),
-        rhReviewed: false,
-        status: 'pendiente',
-        comment: 'Viaje familiar',
-        sentAt: `${addDays(today, -1)}T10:20`,
-      },
-      {
-        ...base,
-        id: `${owner.uid}-ev2`,
-        balance: 15,
-        start: addDays(today, -30),
-        returnDate: addDays(today, -27),
-        rhReviewed: true,
-        status: 'aprobada',
-        sentAt: `${addDays(today, -45)}T08:05`,
-      },
-    ],
-    overtime: [
-      {
-        ...base,
-        id: `${owner.uid}-eo1`,
-        start: `${addDays(today, -8)}T17:00`,
-        end: `${addDays(today, -8)}T20:00`,
-        task: 'Cierre del informe mensual',
-        rhReviewed: true,
-        status: 'aprobada',
-        sentAt: `${addDays(today, -10)}T15:30`,
-      },
-      {
-        ...base,
-        id: `${owner.uid}-eo2`,
-        start: `${addDays(today, -4)}T18:00`,
-        end: `${addDays(today, -4)}T21:00`,
-        task: 'Soporte a la actualización de equipos',
-        rhReviewed: true,
-        status: 'rechazada',
-        sentAt: `${addDays(today, -6)}T09:45`,
-      },
-    ],
-  };
 }

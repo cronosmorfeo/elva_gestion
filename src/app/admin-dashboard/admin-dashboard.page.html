@@ -343,11 +343,7 @@
                   @for (e of filteredEmployees(); track e.id) {
                   <tr>
                     <td>
-                      <strong>
-                        {{ e.name }} @if (e.sample) {
-                        <span class="chip sample-chip">Ejemplo</span>
-                        }
-                      </strong>
+                      <strong>{{ e.name }}</strong>
                       <span class="muted">{{ e.email }}</span>
                     </td>
                     <td>{{ e.role }}</td>
@@ -396,8 +392,12 @@
           <section id="pagos" class="card dark" aria-labelledby="t-pagos">
             <div class="pay-head">
               <h2 id="t-pagos">Pagos pendientes</h2>
-              <span class="sample">Datos de ejemplo</span>
             </div>
+            @if (!payments().length) {
+            <p class="dim">
+              Todavía no hay pagos registrados. Esta sección se conecta cuando se defina la planilla con RH.
+            </p>
+            } @else {
             <div class="pay-box">
               <span class="dim strong">Salarios pendientes</span>
               <span class="amount">{{ paymentSummary().salaries }}</span>
@@ -425,6 +425,7 @@
               }
               <span class="dim">{{ paymentSummary().paidText }}</span>
             </div>
+            }
           </section>
 
           <section id="avisos" class="card" aria-labelledby="t-avisos">
@@ -513,7 +514,6 @@
     >
       <div class="modal-head">
         <div>
-          <span class="sample">Datos de ejemplo</span>
           <h2 id="pay-title">Pagar {{ d.title }}</h2>
         </div>
         <button id="pay-close" type="button" class="icon-btn" aria-label="Cerrar" (click)="closePayment()">✕</button>
@@ -594,9 +594,6 @@
     >
       <div class="modal-head">
         <div>
-          @if (h.employee.sample) {
-          <span class="sample">Datos de ejemplo</span>
-          }
           <h2 id="reports-title">Reportes de {{ h.employee.name }}</h2>
           <span class="muted">{{ h.items.length }} enviados · {{ h.unseen }} sin ver</span>
         </div>
@@ -771,9 +768,6 @@
     >
       <div class="modal-head">
         <div>
-          @if (f.sample) {
-          <span class="sample">Empleado de ejemplo: no se guarda</span>
-          }
           <h2 id="edit-title">Editar empleado</h2>
           <span class="muted inline">{{ f.email }}</span>
         </div>
@@ -926,11 +920,7 @@
         </div>
       </div>
 
-      <h3 class="edit-section">
-        Datos de pago @if (f.sample) {
-        <span class="sample">Ejemplo: no se guarda</span>
-        }
-      </h3>
+      <h3 class="edit-section">Datos de pago</h3>
       @if (editBank() === 'loading') {
       <p class="muted">Cargando la cuenta guardada…</p>
       } @else if (editBank() === 'error') {

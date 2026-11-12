@@ -4,7 +4,6 @@ import type { RequestRow } from './my-requests-utils';
 import {
   ALL_MONTHS,
   defaultMonth,
-  exampleRequests,
   inMonth,
   monthLabel,
   monthOptions,
@@ -65,13 +64,6 @@ describe('my requests', () => {
     expect(row.statusText).toBe('Aprobada');
     expect(overtimeRows([r], 'someone')).toHaveLength(0);
   });
-
-  it('makes example requests for the worker', () => {
-    const ex = exampleRequests({ uid: 'u1', name: 'Ana' }, '2026-11-05');
-    expect(ex.vacations.every((v) => v.ownerId === 'u1' && v.sample === true)).toBe(true);
-    expect(vacationRows(ex.vacations, 'u1')).toHaveLength(2);
-    expect(overtimeRows(ex.overtime, 'u1').map((r) => r.status)).toEqual(['rechazada', 'aprobada']);
-  });
 });
 
 const row = (id: string, month: string, status: RequestRow['status']): RequestRow => ({
@@ -82,7 +74,6 @@ const row = (id: string, month: string, status: RequestRow['status']): RequestRo
   sent: '',
   status,
   statusText: '',
-  sample: false,
   month,
   start: `${month}-15`,
   returnDays: 0,

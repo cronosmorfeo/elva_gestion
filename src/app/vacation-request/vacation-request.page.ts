@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- Añadido collection, addDoc, serverTimestamp
 
+import { localDateTime } from '../notices/notice-utils';
 import { RequestsStore } from '../services/requests-store';
 
 import { holidaysBetween } from './holidays';
@@ -29,9 +30,11 @@ export class VacationRequestPage implements OnInit {
   readonly userEmail = signal<string | null>(null);
   readonly userName = signal<string>('Andrey Rojas'); // Para almacenar el nombre del colaborador
 
+  readonly minStart = localDateTime(new Date()).slice(0, 10);
   readonly start = signal('');
   readonly end = signal('');
   readonly comment = signal('');
+  readonly sending = signal(false);
 
   // Helper to get the actual last vacation day (the day before the return date)
   private readonly lastVacationDay = computed(() => {
@@ -58,6 +61,7 @@ export class VacationRequestPage implements OnInit {
 
   readonly error = computed(() => {
     if (!this.start() || !this.end()) return '';
+    if (this.start() < this.minStart) return 'El primer día no puede ser una fecha pasada.';
     if (this.end() < this.start()) return 'La fecha de reincorporación no puede ser antes del primer día.';
     if (this.end() === this.start()) return 'La fecha de reincorporación debe ser posterior al primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';
@@ -124,7 +128,8 @@ export class VacationRequestPage implements OnInit {
   }
 
   async submit(): Promise<void> {
-    if (!this.canSubmit()) return;
+    if (!this.canSubmit() || this.sending()) return;
+    this.sending.set(true);
     const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
     const days = this.deductedText();
     
@@ -150,6 +155,15 @@ export class VacationRequestPage implements OnInit {
       console.log('[VacationRequest] Solicitud guardada exitosamente en Firestore (vacations_requests).');
     } catch (firebaseError) {
       console.error('[VacationRequest] Error al guardar en Firestore vacations_requests:', firebaseError);
+      const failed = await this.toast.create({
+        message: 'No se pudo enviar la solicitud. Revise la conexión e intente de nuevo.',
+        duration: 5000,
+        position: 'bottom',
+      });
+      await failed.present();
+      return;
+    } finally {
+      this.sending.set(false);
     }
 
     this.start.set('');

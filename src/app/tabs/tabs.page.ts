@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, DestroyRef, EnvironmentInjector, inject, signal } from '@angular/core';
+import { Component, DestroyRef, EnvironmentInjector, effect, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { IonHeader, IonTabs, IonToolbar, ToastController } from '@ionic/angular';
 import { getApps } from 'firebase/app';
@@ -35,8 +35,14 @@ export class TabsPage {
   readonly ownHeader = signal(true);
   // Small screens only: the list of links under the bar.
   readonly menuOpen = signal(false);
+  private leaving = false;
 
   constructor() {
+    // activo is only checked at login, so if an admin deactivates this account while it is open, sign out now.
+    effect(() => {
+      if (this.store.myProfile()?.active === false) void this.signOutDeactivated();
+    });
+
     const destroyRef = inject(DestroyRef);
     const routerEvents = this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
@@ -82,6 +88,22 @@ export class TabsPage {
     await signOut(getAuth());
     this.store.forgetWorker();
     await this.router.navigateByUrl('/tabs/login', { replaceUrl: true });
+  }
+
+  private async signOutDeactivated(): Promise<void> {
+    if (this.leaving) return;
+    this.leaving = true;
+    try {
+      await this.logout();
+      const toast = await this.toast.create({
+        message: 'Su cuenta fue desactivada. Si cree que es un error, hable con RH.',
+        duration: 6000,
+        position: 'bottom',
+      });
+      await toast.present();
+    } finally {
+      this.leaving = false;
+    }
   }
 
   // Decides whether to show the link to the panel (adminGuard still protects the page)

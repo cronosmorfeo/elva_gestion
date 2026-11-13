@@ -47,6 +47,9 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
+import { bankProblem } from '../services/bank-account';
+import { RequestsStore } from '../services/requests-store';
+
 import {
   currencySymbol,
   formatCedula,
@@ -115,7 +118,7 @@ export class Tab3Page {
   salarioTexto = '';
   horaInicio = '';
   horaFin = '';
-  // TODO: payment data is not saved yet; the backend decides where (a private document).
+  // Saved apart, in colaboradores/{uid}/privado/pago.
   pago = { cedula: '', iban: '', monedaCuenta: '' };
 
   // Shown in the success window after the employee is created.
@@ -123,6 +126,7 @@ export class Tab3Page {
 
   private cdr = inject(ChangeDetectorRef);
   private router = inject(Router);
+  private store = inject(RequestsStore);
 
   private app = getApp();
   private db = getFirestore(this.app);
@@ -241,6 +245,13 @@ export class Tab3Page {
       return;
     }
 
+    // Payment data is optional, but if something is typed it must be valid.
+    const problemaPago = bankProblem(this.pago.cedula, this.pago.iban, this.pago.monedaCuenta);
+    if (problemaPago) {
+      alert(problemaPago);
+      return;
+    }
+
     this.guardando = true;
 
     let secondaryApp: ReturnType<typeof initializeApp> | null = null;
@@ -287,6 +298,7 @@ export class Tab3Page {
           jornada: this.colaborador.jornada,
           horarioLaborado: this.colaborador.horarioLaborado.trim(),
           correo: user.email,
+          tipo_colaborador: 'regular',
           activo: true,
           createdAt: serverTimestamp()
         }
@@ -296,6 +308,20 @@ export class Tab3Page {
         nombre: this.colaborador.nombre.trim(),
         correo: this.colaborador.correo.trim().toLowerCase(),
       };
+
+      // The user already exists, so a failure here must not look like the whole creation failed.
+      if (normalizeIban(this.pago.iban)) {
+        try {
+          await this.store.saveBankAccount(user.uid, {
+            cedula: this.pago.cedula,
+            iban: this.pago.iban,
+            currency: this.pago.monedaCuenta
+          });
+        } catch (errorPago) {
+          console.error('Error guardando la cuenta de pago:', errorPago);
+          alert('El usuario se creó, pero no se pudo guardar la cuenta de pago. Agregala desde Editar empleado.');
+        }
+      }
 
       this.limpiarFormulario();
 

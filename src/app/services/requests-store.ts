@@ -18,7 +18,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 
-import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
+import type { OvertimeRequest, VacationRequest } from '../admin-dashboard/admin-requests';
 import { vacationDays } from '../admin-dashboard/admin-requests';
 import type { Notice, NoticeInput } from '../notices/notice-utils';
 import { localDateTime, sortNotices, unseenNotices } from '../notices/notice-utils';
@@ -204,19 +204,10 @@ export class RequestsStore {
 
   // Rejects with a reason the worker will read. In a transaction, so a request the worker just
   // cancelled, or another admin just decided, is not overwritten.
-  async rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string): Promise<void> {
-    const db = getFirestore();
-    const ref = doc(db, kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id);
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(ref);
-      if (!snap.exists()) throw new ApproveError('no-existe');
-      const estado: unknown = snap.data()['estado'];
-      if (estado === 'cancelada') throw new ApproveError('cancelada');
-      if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
-      tx.update(ref, {
-        estado: 'rechazada',
-        decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim() },
-      });
+  rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string): Promise<void> {
+    return this.decidePending(kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id, {
+      estado: 'rechazada',
+      decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim() },
     });
   }
 
@@ -311,6 +302,8 @@ export class RequestsStore {
   }
 
   async saveBankAccount(uid: string, account: { cedula: string; iban: string; currency: string }): Promise<void> {
+    // Nobody changes the account they get paid to; another admin does it.
+    if (uid === this.uid) throw new Error('An admin cannot change their own payment account.');
     const [col, ...rest] = bankDocPath(uid);
     await setDoc(doc(getFirestore(), col, ...rest), {
       cedula: account.cedula.trim(),
@@ -322,7 +315,10 @@ export class RequestsStore {
   }
 
   approveOvertime(id: string): Promise<void> {
-    return this.decide(COLLECTIONS.overtime, id, 'aprobada');
+    return this.decidePending(COLLECTIONS.overtime, id, {
+      estado: 'aprobada',
+      decision: { por: this.uid, fecha: serverTimestamp() },
+    });
   }
 
   async saveNotice(input: NoticeInput, author: string, id?: string): Promise<void> {
@@ -376,10 +372,18 @@ export class RequestsStore {
     await batch.commit();
   }
 
-  private async decide(name: string, id: string, status: RequestStatus): Promise<void> {
-    await updateDoc(doc(getFirestore(), name, id), {
-      estado: status,
-      decision: { por: this.uid, fecha: serverTimestamp() },
+  // Saves a decision only while the request is still pending, in one transaction,
+  // so it never overwrites a cancellation or another admin's decision.
+  private async decidePending(name: string, id: string, changes: DocumentData): Promise<void> {
+    const db = getFirestore();
+    const ref = doc(db, name, id);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new ApproveError('no-existe');
+      const estado: unknown = snap.data()['estado'];
+      if (estado === 'cancelada') throw new ApproveError('cancelada');
+      if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
+      tx.update(ref, changes);
     });
   }
 

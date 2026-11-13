@@ -463,7 +463,18 @@ export class AdminDashboardPage {
       this.openReject('horas', id, request.employee);
       return;
     }
-    if (!(await this.saved(this.store.approveOvertime(id)))) return;
+    try {
+      await this.store.approveOvertime(id);
+    } catch (err) {
+      const message =
+        err instanceof ApproveError
+          ? approveProblemText(err.problem, request.employee, 0)
+          : 'No se pudo guardar. Revisá la conexión e intentá de nuevo.';
+      if (!(err instanceof ApproveError)) console.error('[AdminDashboard] Could not approve the overtime:', err);
+      const toast = await this.toast.create({ message, duration: 5000, position: 'bottom' });
+      await toast.present();
+      return;
+    }
     await this.logDecision(`las horas extra de ${request.employee}`, status);
   }
 

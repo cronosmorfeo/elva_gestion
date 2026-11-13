@@ -74,7 +74,7 @@
       </section>
       }
 
-      <ion-button expand="block" type="submit" class="submit-btn" [disabled]="!canSubmit()">
+      <ion-button expand="block" type="submit" class="submit-btn" [disabled]="!canSubmit() || sending()">
         Enviar solicitud
       </ion-button>
     </form>

@@ -34,6 +34,7 @@ export class VacationRequestPage implements OnInit {
   readonly start = signal('');
   readonly end = signal('');
   readonly comment = signal('');
+  readonly sending = signal(false);
 
   // Helper to get the actual last vacation day (the day before the return date)
   private readonly lastVacationDay = computed(() => {
@@ -127,7 +128,8 @@ export class VacationRequestPage implements OnInit {
   }
 
   async submit(): Promise<void> {
-    if (!this.canSubmit()) return;
+    if (!this.canSubmit() || this.sending()) return;
+    this.sending.set(true);
     const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
     const days = this.deductedText();
     
@@ -153,6 +155,15 @@ export class VacationRequestPage implements OnInit {
       console.log('[VacationRequest] Solicitud guardada exitosamente en Firestore (vacations_requests).');
     } catch (firebaseError) {
       console.error('[VacationRequest] Error al guardar en Firestore vacations_requests:', firebaseError);
+      const failed = await this.toast.create({
+        message: 'No se pudo enviar la solicitud. Revise la conexión e intente de nuevo.',
+        duration: 5000,
+        position: 'bottom',
+      });
+      await failed.present();
+      return;
+    } finally {
+      this.sending.set(false);
     }
 
     this.start.set('');

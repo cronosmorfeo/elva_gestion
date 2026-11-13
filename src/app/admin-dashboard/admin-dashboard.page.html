@@ -921,7 +921,9 @@
       </div>
 
       <h3 class="edit-section">Datos de pago</h3>
-      @if (editBank() === 'loading') {
+      @if (f.self) {
+      <p class="muted">Tu cuenta la cambia otro administrador.</p>
+      } @if (editBank() === 'loading') {
       <p class="muted">Cargando la cuenta guardada…</p>
       } @else if (editBank() === 'error') {
       <p class="error-text">No se pudo cargar la cuenta guardada. Cerrá y abrí de nuevo antes de cambiarla.</p>
@@ -937,6 +939,7 @@
             inputmode="numeric"
             placeholder="Ej. 1-1234-5678"
             [value]="f.cedula"
+            [disabled]="f.self"
             (input)="setEditCedula($event)"
           />
           @if (editState()?.cedulaError) {
@@ -945,7 +948,12 @@
         </div>
         <div class="edit-field">
           <label for="edit-moneda-cuenta">Moneda de la cuenta</label>
-          <select id="edit-moneda-cuenta" [value]="f.monedaCuenta" (change)="setEditField('monedaCuenta', $event)">
+          <select
+            id="edit-moneda-cuenta"
+            [value]="f.monedaCuenta"
+            [disabled]="f.self"
+            (change)="setEditField('monedaCuenta', $event)"
+          >
             <option value="">Seleccionar moneda</option>
             <option value="CRC" [selected]="f.monedaCuenta === 'CRC'">Colones (CRC)</option>
             <option value="USD" [selected]="f.monedaCuenta === 'USD'">Dólares (USD)</option>
@@ -960,6 +968,7 @@
             autocomplete="off"
             placeholder="CR00 0000 0000 0000 0000 00"
             [value]="f.iban"
+            [disabled]="f.self"
             (input)="setEditIban($event)"
           />
           @if (f.iban && editState()?.ibanComplete) { @if (editState()?.ibanValid) {

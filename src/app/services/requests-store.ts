@@ -311,6 +311,8 @@ export class RequestsStore {
   }
 
   async saveBankAccount(uid: string, account: { cedula: string; iban: string; currency: string }): Promise<void> {
+    // Nobody changes the account they get paid to; another admin does it.
+    if (uid === this.uid) throw new Error('An admin cannot change their own payment account.');
     const [col, ...rest] = bankDocPath(uid);
     await setDoc(doc(getFirestore(), col, ...rest), {
       cedula: account.cedula.trim(),

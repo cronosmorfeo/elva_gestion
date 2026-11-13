@@ -2,7 +2,7 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { IonContent, ToastController } from '@ionic/angular';
 import { getAuth } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, getFirestore, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getFirestore, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 import type { NoticeInput } from '../notices/notice-utils';
 import { MAX_NOTICE_MESSAGE, MAX_NOTICE_TITLE, noticeProblem } from '../notices/notice-utils';
@@ -393,9 +393,10 @@ export class AdminDashboardPage {
   });
 
   constructor() {
-    this.scheduleMidnight(inject(DestroyRef));
+    const destroyRef = inject(DestroyRef);
+    this.scheduleMidnight(destroyRef);
     void this.loadProfile();
-    void this.loadEmployees();
+    this.watchEmployees(destroyRef);
   }
 
   goTo(id: string): void {
@@ -931,35 +932,41 @@ export class AdminDashboardPage {
     }
   }
 
-  private async loadEmployees(): Promise<void> {
-    try {
-      const snap = await getDocs(collection(getFirestore(), 'colaboradores'));
-      const list = snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          name: String(data['nombre'] ?? 'Sin nombre'),
-          email: String(data['correo'] ?? ''),
-          role: roleLabel(data['tipo_colaborador']),
-          schedule: SCHEDULES[String(data['jornada'])] ?? '—',
-          startDate: typeof data['fechaIngreso'] === 'string' ? formatShortDate(data['fechaIngreso']) : '—',
-          active: data['activo'] === true,
-          tipo: typeof data['tipo_colaborador'] === 'string' ? data['tipo_colaborador'] : 'regular',
-          jornada: String(data['jornada'] ?? ''),
-          horario: String(data['horarioLaborado'] ?? ''),
-          fechaIngreso: typeof data['fechaIngreso'] === 'string' ? data['fechaIngreso'] : '',
-          salario: typeof data['salario'] === 'number' ? data['salario'] : null,
-          moneda: String(data['moneda'] ?? ''),
-          pais: String(data['pais'] ?? ''),
-          vacationBalance: typeof data['vacaciones_disponibles'] === 'number' ? data['vacaciones_disponibles'] : null,
-        };
-      });
-      list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
-      this.employees.set(list);
-      this.employeesState.set('ready');
-    } catch {
-      this.employeesState.set('error');
-    }
+  // Live, so a new employee, a deactivation or a balance change shows up without reloading.
+  private watchEmployees(destroyRef: DestroyRef): void {
+    const stop = onSnapshot(
+      collection(getFirestore(), 'colaboradores'),
+      (snap) => {
+        const list = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: String(data['nombre'] ?? 'Sin nombre'),
+            email: String(data['correo'] ?? ''),
+            role: roleLabel(data['tipo_colaborador']),
+            schedule: SCHEDULES[String(data['jornada'])] ?? '—',
+            startDate: typeof data['fechaIngreso'] === 'string' ? formatShortDate(data['fechaIngreso']) : '—',
+            active: data['activo'] === true,
+            tipo: typeof data['tipo_colaborador'] === 'string' ? data['tipo_colaborador'] : 'regular',
+            jornada: String(data['jornada'] ?? ''),
+            horario: String(data['horarioLaborado'] ?? ''),
+            fechaIngreso: typeof data['fechaIngreso'] === 'string' ? data['fechaIngreso'] : '',
+            salario: typeof data['salario'] === 'number' ? data['salario'] : null,
+            moneda: String(data['moneda'] ?? ''),
+            pais: String(data['pais'] ?? ''),
+            vacationBalance: typeof data['vacaciones_disponibles'] === 'number' ? data['vacaciones_disponibles'] : null,
+          };
+        });
+        list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        this.employees.set(list);
+        this.employeesState.set('ready');
+      },
+      (err) => {
+        console.error('[AdminDashboard] Could not read the employees:', err);
+        this.employeesState.set('error');
+      },
+    );
+    destroyRef.onDestroy(stop);
   }
 }
 

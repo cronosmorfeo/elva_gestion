@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- Añadido collection, addDoc, serverTimestamp
 
+import { localDateTime } from '../notices/notice-utils';
 import { RequestsStore } from '../services/requests-store';
 
 import { holidaysBetween } from './holidays';
@@ -29,6 +30,7 @@ export class VacationRequestPage implements OnInit {
   readonly userEmail = signal<string | null>(null);
   readonly userName = signal<string>('Andrey Rojas'); // Para almacenar el nombre del colaborador
 
+  readonly minStart = localDateTime(new Date()).slice(0, 10);
   readonly start = signal('');
   readonly end = signal('');
   readonly comment = signal('');
@@ -58,6 +60,7 @@ export class VacationRequestPage implements OnInit {
 
   readonly error = computed(() => {
     if (!this.start() || !this.end()) return '';
+    if (this.start() < this.minStart) return 'El primer día no puede ser una fecha pasada.';
     if (this.end() < this.start()) return 'La fecha de reincorporación no puede ser antes del primer día.';
     if (this.end() === this.start()) return 'La fecha de reincorporación debe ser posterior al primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';

@@ -20,6 +20,7 @@ export const routes: Routes = [
       },
       {
         path: 'tab3',
+        canActivate: [adminGuard],
         loadComponent: () => import('../tab3/tab3.page').then((m) => m.Tab3Page),
       },
       {

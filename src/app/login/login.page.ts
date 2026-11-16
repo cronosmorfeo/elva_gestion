@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { 
@@ -13,6 +13,7 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { mailOutline, lockClosedOutline } from 'ionicons/icons';
+
 import { AuthService } from '../services/auth';
 
 @Component({
@@ -43,7 +44,7 @@ export class LoginPage {
     addIcons({ mailOutline, lockClosedOutline });
   }
 
-  async onLogin() {
+  async onLogin(): Promise<void> {
     if (!this.correo || !this.password) {
       this.showToast('Por favor, ingresa tu correo y contraseña.', 'danger');
       return;

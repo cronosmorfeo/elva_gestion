@@ -1,9 +1,8 @@
 
+import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-
 import {
   IonHeader,
   IonToolbar,
@@ -18,6 +17,18 @@ import {
   IonButtons,
   IonSpinner
 } from '@ionic/angular';
+import { getApp, initializeApp, deleteApp } from 'firebase/app';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  updateProfile
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 import { addIcons } from 'ionicons';
 import {
   arrowBackOutline,
@@ -31,21 +42,6 @@ import {
   timeOutline,
   walletOutline,
 } from 'ionicons/icons';
-
-import { getApp, initializeApp, deleteApp } from 'firebase/app';
-
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  updateProfile
-} from 'firebase/auth';
-
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  serverTimestamp
-} from 'firebase/firestore';
 
 import { bankProblem } from '../services/bank-account';
 import { RequestsStore } from '../services/requests-store';
@@ -212,7 +208,7 @@ export class Tab3Page {
     }
   }
 
-  async crearColaborador() {
+  async crearColaborador(): Promise<void> {
 
     if (this.guardando) return;
 
@@ -357,7 +353,7 @@ export class Tab3Page {
     }
   }
 
-  limpiarFormulario() {
+  limpiarFormulario(): void {
     this.colaborador = {
       nombre: '',
       pais: '',

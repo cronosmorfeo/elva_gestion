@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal, OnInit } from '@angular/core';
+import type { OnInit } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- Añadido collection, addDoc, serverTimestamp

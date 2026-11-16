@@ -51,3 +51,19 @@ export function canCancel(status: string, start: string, now: string): CancelChe
 }
 
 export type CancelResult = { kind: 'cancelada'; returnedDays: number; wasApproved: boolean } | { kind: CancelCheck };
+
+// Days a cancellation gives back: only an approved vacation, and only what its approval deducted
+// (decision.diasDescontados). Pending requests and overtime never deducted anything.
+export function deductedDays(kind: 'vacaciones' | 'horas', status: string, decision: unknown): number {
+  if (kind !== 'vacaciones' || status !== 'aprobada') return 0;
+  if (typeof decision !== 'object' || decision === null) return 0;
+  const days = (decision as Record<string, unknown>)['diasDescontados'];
+  return typeof days === 'number' && Number.isFinite(days) && days > 0 ? days : 0;
+}
+
+// The balance after giving the days back, or null when there is nothing to change
+// (no days to give back, or the worker has no balance on record).
+export function balanceAfterCancel(balance: unknown, days: number): number | null {
+  if (days <= 0 || typeof balance !== 'number' || !Number.isFinite(balance)) return null;
+  return balance + days;
+}

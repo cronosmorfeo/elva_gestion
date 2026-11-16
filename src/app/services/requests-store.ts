@@ -49,7 +49,14 @@ import type { BrowserNotice, LastSeen } from './notification-events';
 import { lastSeen, noticeEvents, overtimeEvents, vacationEvents } from './notification-events';
 import { NotificationsService } from './notifications';
 import type { ApproveResult, CancelResult } from './vacation-balance';
-import { ApproveError, availableDays, canCancel, checkBalance } from './vacation-balance';
+import {
+  ApproveError,
+  availableDays,
+  balanceAfterCancel,
+  canCancel,
+  checkBalance,
+  deductedDays,
+} from './vacation-balance';
 
 // Requests, notices and reports from Firestore, shared by the worker pages and the dashboard.
 // The lists update live: a new request or a decision shows up without reloading.
@@ -252,17 +259,12 @@ export class RequestsStore {
       const check = canCancel(estado, start, now);
       if (check !== 'si') return { kind: check };
       const wasApproved = estado === 'aprobada';
-      const decision: unknown = data['decision'];
-      const deducted =
-        wasApproved && kind === 'vacaciones' && typeof decision === 'object' && decision !== null
-          ? (decision as Record<string, unknown>)['diasDescontados']
-          : 0;
-      const days = typeof deducted === 'number' && deducted > 0 ? deducted : 0;
+      const days = deductedDays(kind, estado, data['decision']);
       const ownerRef = days && typeof data['uid'] === 'string' ? doc(db, 'colaboradores', data['uid']) : null;
       const owner = ownerRef ? await tx.get(ownerRef) : null;
-      const balance: unknown = owner?.data()?.['vacaciones_disponibles'];
-      const returnedDays = ownerRef && typeof balance === 'number' ? days : 0;
-      if (ownerRef && returnedDays) tx.update(ownerRef, { vacaciones_disponibles: (balance as number) + returnedDays });
+      const next = ownerRef ? balanceAfterCancel(owner?.data()?.['vacaciones_disponibles'], days) : null;
+      if (ownerRef && next !== null) tx.update(ownerRef, { vacaciones_disponibles: next });
+      const returnedDays = next === null ? 0 : days;
       tx.update(ref, {
         estado: 'cancelada',
         cancelacion: {

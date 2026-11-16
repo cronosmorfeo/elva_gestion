@@ -1,4 +1,12 @@
-import { ApproveError, approveProblemText, availableDays, canCancel, checkBalance } from './vacation-balance';
+import {
+  ApproveError,
+  approveProblemText,
+  availableDays,
+  balanceAfterCancel,
+  canCancel,
+  checkBalance,
+  deductedDays,
+} from './vacation-balance';
 
 describe('checkBalance', () => {
   it('deducts the days when the balance is enough', () => {
@@ -58,5 +66,38 @@ describe('approveProblemText', () => {
     const err = new ApproveError('insuficiente', 3);
     expect(err.problem).toBe('insuficiente');
     expect(err.balance).toBe(3);
+  });
+});
+
+describe('deductedDays', () => {
+  it('gives back what an approved vacation deducted', () => {
+    expect(deductedDays('vacaciones', 'aprobada', { por: 'admin', diasDescontados: 5 })).toBe(5);
+  });
+
+  it('gives back nothing for pending requests or overtime', () => {
+    expect(deductedDays('vacaciones', 'pendiente', { diasDescontados: 5 })).toBe(0);
+    expect(deductedDays('horas', 'aprobada', { diasDescontados: 5 })).toBe(0);
+  });
+
+  it('gives back nothing when the approval did not deduct or the data is broken', () => {
+    expect(deductedDays('vacaciones', 'aprobada', { diasDescontados: 0 })).toBe(0);
+    expect(deductedDays('vacaciones', 'aprobada', { por: 'admin' })).toBe(0);
+    expect(deductedDays('vacaciones', 'aprobada', undefined)).toBe(0);
+    expect(deductedDays('vacaciones', 'aprobada', { diasDescontados: '5' })).toBe(0);
+    expect(deductedDays('vacaciones', 'aprobada', { diasDescontados: -3 })).toBe(0);
+    expect(deductedDays('vacaciones', 'aprobada', { diasDescontados: Number.NaN })).toBe(0);
+  });
+});
+
+describe('balanceAfterCancel', () => {
+  it('adds the days back to the balance', () => {
+    expect(balanceAfterCancel(7, 5)).toBe(12);
+    expect(balanceAfterCancel(0, 3)).toBe(3);
+  });
+
+  it('changes nothing when there are no days or no balance on record', () => {
+    expect(balanceAfterCancel(7, 0)).toBeNull();
+    expect(balanceAfterCancel(undefined, 5)).toBeNull();
+    expect(balanceAfterCancel('7', 5)).toBeNull();
   });
 });

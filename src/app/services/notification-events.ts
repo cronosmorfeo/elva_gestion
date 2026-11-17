@@ -1,6 +1,8 @@
 import { addDays, formatShortDate, formatTime } from '../admin-dashboard/admin-dates';
 import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
+import { halfDayText } from '../admin-dashboard/admin-requests';
 import type { Notice } from '../notices/notice-utils';
+import { dayCount } from '../shared/day-count';
 
 import { COLLECTIONS } from './firestore-mappers';
 
@@ -24,7 +26,9 @@ export function lastSeen(list: { id: string; status?: RequestStatus }[]): Map<st
 // Admins hear about new pending requests; a worker hears when one of theirs is decided.
 export function vacationEvents(before: LastSeen, list: VacationRequest[], admin: boolean): BrowserNotice[] {
   const dates = (r: VacationRequest): string =>
-    `del ${formatShortDate(r.start)} al ${formatShortDate(addDays(r.returnDate, -1))}`;
+    r.halfDayFrom
+      ? `el ${formatShortDate(r.start)}, medio día ${halfDayText(r.halfDayFrom)}`
+      : `del ${formatShortDate(r.start)} al ${formatShortDate(addDays(r.returnDate, -1))}`;
   if (admin) {
     const created = added(before, list).map((r) => ({
       tag: `${COLLECTIONS.vacations}-${r.id}-pendiente`,
@@ -104,7 +108,7 @@ function reasonText(r: { status: RequestStatus; reason?: string }): string {
 
 function approvedNote(days: number | undefined): string {
   if (!days) return ' (estaban aprobadas).';
-  return ` (estaban aprobadas; se le ${days === 1 ? 'devolvió 1 día' : `devolvieron ${days} días`}).`;
+  return ` (estaban aprobadas; se le ${days === 1 ? 'devolvió' : 'devolvieron'} ${dayCount(days)}).`;
 }
 
 function added<T extends { id: string; status: RequestStatus }>(before: LastSeen, list: T[]): T[] {

@@ -19,14 +19,14 @@ Internal HR app for ELVA IA. Employees request vacations and overtime; admins an
 **Workers**
 
 - **Inicio:** summary of available vacation days, pending requests, new notices and this week's report, plus upcoming dates.
-- **Vacaciones** and **Horas extra:** request them with a day-by-day breakdown (weekends and Costa Rica holidays are not deducted; overtime shows its pay rate).
+- **Vacaciones** and **Horas extra:** request them with a day-by-day breakdown (weekends and Costa Rica holidays are not deducted; half days of 4 hours; overtime shows its pay rate).
 - **Mis solicitudes:** status of each request, filter by month, cancel pending or approved ones that have not started.
 - **Avisos**, **Mi reporte** (optional weekly report) and **Mi perfil** (own data and payment account, read only).
 
 **Admins and HR** (`/tabs/dashboard`)
 
 - Approve or reject requests (a reason is required), with search, month filter and a warning when vacations overlap.
-- Vacation balance is deducted on approval and returned if the worker cancels.
+- Vacation balance grows 1 day per full month (12 per year by default), is deducted on approval and returned if the worker cancels.
 - Manage employees and their payment accounts, publish notices and read weekly reports.
 
 Notifications reach admins (new or cancelled requests, account change requests) and workers (decisions, notices, account changes). Pending payments are not connected yet.

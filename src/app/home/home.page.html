@@ -7,7 +7,7 @@
     <div class="home-grid">
       <a class="card home-tile" routerLink="/tabs/vacaciones">
         <span class="home-label">Vacaciones</span>
-        <strong class="home-value">{{ available() ?? '—' }}</strong>
+        <strong class="home-value">{{ availableText() }}</strong>
         <span class="home-sub">{{ available() === null ? 'sin saldo registrado' : 'días disponibles' }}</span>
         <span class="home-go">Pedir vacaciones →</span>
       </a>

@@ -1,6 +1,14 @@
 import { addDays, formatShortDate, formatTime } from '../admin-dashboard/admin-dates';
 import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
-import { formatHours, overtimeMinutes, overtimePay, vacationDays } from '../admin-dashboard/admin-requests';
+import {
+  formatHours,
+  halfDayText,
+  overtimeMinutes,
+  overtimePay,
+  returnDayText,
+  vacationDays,
+} from '../admin-dashboard/admin-requests';
+import { dayCount } from '../shared/day-count';
 
 export type RequestKind = 'vacaciones' | 'horas';
 
@@ -97,8 +105,12 @@ export function vacationRows(list: VacationRequest[], ownerId: string): RequestR
       const days = vacationDays(r);
       return {
         id: r.id,
-        title: `Del ${formatShortDate(r.start)} al ${formatShortDate(addDays(r.returnDate, -1))}`,
-        detail: `${days} ${days === 1 ? 'día' : 'días'} · vuelve el ${formatShortDate(r.returnDate)}`,
+        title: r.halfDayFrom
+          ? `Medio día el ${formatShortDate(r.start)}`
+          : `Del ${formatShortDate(r.start)} al ${formatShortDate(addDays(r.returnDate, -1))}`,
+        detail: r.halfDayFrom
+          ? `${halfDayText(r.halfDayFrom)} · vuelve el ${returnDayText(r)}`
+          : `${dayCount(days)} · vuelve el ${formatShortDate(r.returnDate)}`,
         note: r.comment ?? '',
         sent: sentText(r.sentAt),
         status: r.status,

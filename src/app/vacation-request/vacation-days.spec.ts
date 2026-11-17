@@ -49,8 +49,9 @@ describe('vacation days', () => {
     expect(count('2028-04-10', '2028-04-14')).toBe(2);
   });
 
-  it('deducts optional holidays like a normal day', () => {
-    expect(count('2026-11-30', '2026-12-01')).toBe(2);
+  it('does not deduct optional holidays', () => {
+    expect(count('2026-11-30', '2026-12-01')).toBe(1);
+    expect(count('2026-08-31', '2026-08-31')).toBe(0);
     const dec1 = days('2027-12-01', '2027-12-01')[0];
     expect(dec1.kind).toBe('optionalHoliday');
     expect(dec1.holidayName).toBe('Abolición del Ejército');

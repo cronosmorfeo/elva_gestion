@@ -5,6 +5,7 @@ import { IonContent } from '@ionic/angular';
 import { formatLongDate, localIsoDate } from '../admin-dashboard/admin-dates';
 import { mondayOf, weekLabel } from '../reports/report-utils';
 import { RequestsStore } from '../services/requests-store';
+import { dayNumber } from '../shared/day-count';
 
 import { chipDay, chipMonth, firstName, greeting, pendingCount, reportSentThisWeek, upcomingItems } from './home-utils';
 
@@ -24,6 +25,10 @@ export class HomePage {
   readonly hello = computed(() => greeting(this.now().getHours()));
 
   readonly available = computed(() => this.store.myAvailableDays());
+  readonly availableText = computed(() => {
+    const available = this.available();
+    return available === null ? '—' : dayNumber(available);
+  });
   readonly pending = computed(() => pendingCount(this.store.vacations(), this.store.overtime(), this.store.myUid()));
   readonly unseenNotices = this.store.unseenNotices;
   readonly latestNotice = computed(() => this.store.sortedNotices().at(0)?.title ?? 'No hay avisos');

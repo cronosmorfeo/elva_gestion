@@ -2,15 +2,15 @@
   <div class="page">
     <h1>Solicitar vacaciones</h1>
     <p class="intro">
-      Elija el primer y el último día. Solo se descuentan los días laborales: los fines de semana y los feriados
-      obligatorios no cuentan.
+      Elija el primer día y el día en que vuelve. Solo se descuentan los días laborales: los fines de semana y los
+      feriados no cuentan. Para medio día (4 horas), elija el mismo día en las dos fechas.
     </p>
 
     <div class="balance card">
       <span>Días disponibles</span>
-      <strong>{{ availableDays() }}</strong>
+      <strong>{{ availableDaysText() }}</strong>
       @if (store.myPendingVacationDays() > 0) {
-      <small>Ya se restaron {{ store.myPendingVacationDays() }} de solicitudes pendientes</small>
+      <small>Ya se restaron {{ pendingText() }} de solicitudes pendientes</small>
       } @else if (!hasBalance()) {
       <small>Sin saldo registrado</small>
       }
@@ -28,7 +28,7 @@
         ></ion-input>
         <ion-input
           type="date"
-          label="Reincorporacion"
+          label="Reincorporación"
           labelPlacement="stacked"
           fill="outline"
           [min]="start()"
@@ -36,6 +36,20 @@
           (ionInput)="setEnd($event.detail.value)"
         ></ion-input>
       </div>
+
+      @if (isHalfDay()) {
+      <label class="field">
+        <span>Medio día (4 horas): ¿desde qué hora no trabaja?</span>
+        <select [value]="halfDayFrom()" (change)="setHalfDayFrom($any($event.target).value)">
+          <option value="" disabled>Elija la hora</option>
+          @for (time of halfDayStarts; track time.value) {
+          <option [value]="time.value">{{ time.label }}</option>
+          }
+        </select>
+      </label>
+      @if (halfDayHint()) {
+      <p class="hint">{{ halfDayHint() }}</p>
+      } }
 
       <ion-textarea
         label="Comentario para RH (opcional)"

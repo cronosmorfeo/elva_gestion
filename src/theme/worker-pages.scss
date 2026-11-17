@@ -209,6 +209,21 @@ $red-soft: #fdecea;
       }
     }
 
+    // Vacations: weekends and holidays are not deducted.
+    .free {
+      border-left-color: #c5d1cf;
+      opacity: 0.7;
+
+      .weekday {
+        color: $muted;
+      }
+
+      .status {
+        background: $teal-soft;
+        color: $teal-dark;
+      }
+    }
+
     .over {
       border-left-color: $red;
       background: $red-soft;

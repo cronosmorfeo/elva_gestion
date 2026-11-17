@@ -5,6 +5,7 @@ import { formatShortDate, formatTime, localIsoDate } from '../admin-dashboard/ad
 import { maskIban } from '../admin-dashboard/admin-requests';
 import { MAX_BANK_NOTE, ibanText, maskCedula, updatedText } from '../services/bank-account';
 import { RequestsStore } from '../services/requests-store';
+import { dayCount, dayNumber } from '../shared/day-count';
 
 import { longDay, seniority } from './profile-utils';
 
@@ -22,6 +23,15 @@ export class ProfilePage {
   readonly balance = this.store.myBalance;
   readonly available = this.store.myAvailableDays;
   readonly pendingDays = this.store.myPendingVacationDays;
+  readonly balanceText = computed(() => {
+    const balance = this.balance();
+    return balance === null ? 'Sin saldo registrado' : dayCount(balance);
+  });
+  readonly availableText = computed(() => {
+    const available = this.available();
+    return available === null ? '—' : dayNumber(available);
+  });
+  readonly pendingText = computed(() => dayCount(this.pendingDays()));
   readonly today = signal(localIsoDate(new Date()));
   readonly startText = computed(() => {
     const start = this.profile()?.startDate ?? '';

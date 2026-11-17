@@ -2,6 +2,7 @@ import type { DocumentData } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 
 import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
+import { HALF_DAY_STARTS } from '../admin-dashboard/admin-requests';
 import type { Notice } from '../notices/notice-utils';
 import { localDateTime } from '../notices/notice-utils';
 import type { ReportFile, WorkReport } from '../reports/report-utils';
@@ -37,6 +38,7 @@ export function toVacationRequest(id: string, data: DocumentData): VacationReque
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
     deductedDays: deductedDays(data['decision']),
+    halfDayFrom: HALF_DAY_STARTS.includes(text(data['medioDiaDesde'])) ? text(data['medioDiaDesde']) : undefined,
     reason: reason(data['decision']),
     comment: text(data['comentarioRRHH']) || undefined,
     sentAt: dateTime(data['fechaSolicitud']),

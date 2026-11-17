@@ -1,4 +1,51 @@
-// What happens to a worker's vacation balance (colaboradores.vacaciones_disponibles) when a request is approved.
+import { dayCount } from '../shared/day-count';
+
+// Vacation balance rules (confirmed by HR, Nov 2026):
+// - Everyone earns DEFAULT_DAYS_PER_YEAR (12) a year: one day per full month.
+// - Days are earned from the day the employee's balance was entered in the app (colaboradores.acumulaDesde),
+//   so days earned before that are not counted twice.
+// - colaboradores.vacaciones_disponibles is the entered balance minus what was used; the current balance adds what was earned.
+
+export const DEFAULT_DAYS_PER_YEAR = 12;
+
+// Full months from `from` to `today` (both YYYY-MM-DD). A month is full on the same day of the month,
+// or on the last day when that month is shorter (Jan 31 -> Feb 28).
+export function fullMonths(from: string, today: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(today) || today < from) return 0;
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = today.split('-').map(Number);
+  let months = (ty - fy) * 12 + (tm - fm);
+  const lastDayOfThisMonth = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+  if (td < Math.min(fd, lastDayOfThisMonth)) months--;
+  return Math.max(0, months);
+}
+
+// Days earned since `from`, rounded down to half days (the smallest amount that can be requested).
+export function earnedDays(from: unknown, daysPerYear: unknown, today: string): number {
+  if (typeof from !== 'string') return 0;
+  const perYear = typeof daysPerYear === 'number' && daysPerYear > 0 ? daysPerYear : DEFAULT_DAYS_PER_YEAR;
+  return Math.floor(((fullMonths(from, today) * perYear) / 12) * 2) / 2;
+}
+
+// The balance today from a colaboradores document, or null when it has no balance on record.
+export function currentBalance(data: Record<string, unknown> | undefined, today: string): number | null {
+  const stored = data?.['vacaciones_disponibles'];
+  if (typeof stored !== 'number' || !Number.isFinite(stored)) return null;
+  return stored + earnedDays(data?.['acumulaDesde'], data?.['diasAnuales'], today);
+}
+
+// What to save when an admin sets the current balance by hand: the stored part, so that stored + earned = balance.
+// The first time, earning starts today.
+export function storedBalance(
+  balance: number,
+  data: Record<string, unknown> | undefined,
+  today: string,
+): { vacaciones_disponibles: number; acumulaDesde: string } {
+  const from = typeof data?.['acumulaDesde'] === 'string' ? data['acumulaDesde'] : today;
+  return { vacaciones_disponibles: balance - earnedDays(from, data?.['diasAnuales'], today), acumulaDesde: from };
+}
+
+// What happens to a worker's vacation balance when a request is approved.
 export type BalanceCheck =
   { kind: 'descontar'; next: number } | { kind: 'insuficiente'; balance: number } | { kind: 'sin-saldo' };
 
@@ -32,7 +79,7 @@ export class ApproveError extends Error {
 // Text for the admin when an approval could not be saved.
 export function approveProblemText(problem: ApproveProblem, employee: string, balance: number): string {
   if (problem === 'insuficiente') {
-    return `${employee} tiene solo ${balance} ${balance === 1 ? 'día' : 'días'} de vacaciones. No se aprobó.`;
+    return `${employee} tiene solo ${dayCount(balance)} de vacaciones. No se aprobó.`;
   }
   if (problem === 'ya-decidida') return 'Esa solicitud ya fue decidida por otra persona.';
   if (problem === 'cancelada') return `${employee} canceló esa solicitud.`;

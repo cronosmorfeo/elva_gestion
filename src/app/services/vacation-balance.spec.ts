@@ -5,7 +5,11 @@ import {
   balanceAfterCancel,
   canCancel,
   checkBalance,
+  currentBalance,
   deductedDays,
+  earnedDays,
+  fullMonths,
+  storedBalance,
 } from './vacation-balance';
 
 describe('checkBalance', () => {
@@ -99,5 +103,77 @@ describe('balanceAfterCancel', () => {
     expect(balanceAfterCancel(7, 0)).toBeNull();
     expect(balanceAfterCancel(undefined, 5)).toBeNull();
     expect(balanceAfterCancel('7', 5)).toBeNull();
+  });
+});
+
+describe('fullMonths', () => {
+  it('counts a month on the same day of the next month', () => {
+    expect(fullMonths('2026-11-17', '2026-12-16')).toBe(0);
+    expect(fullMonths('2026-11-17', '2026-12-17')).toBe(1);
+    expect(fullMonths('2026-11-17', '2027-11-17')).toBe(12);
+  });
+
+  it('uses the last day when the month is shorter', () => {
+    expect(fullMonths('2027-01-31', '2027-02-27')).toBe(0);
+    expect(fullMonths('2027-01-31', '2027-02-28')).toBe(1);
+    expect(fullMonths('2028-01-31', '2028-02-29')).toBe(1); // leap year
+    expect(fullMonths('2027-01-31', '2027-03-30')).toBe(1);
+    expect(fullMonths('2027-01-31', '2027-03-31')).toBe(2);
+  });
+
+  it('is 0 before the start or with bad dates', () => {
+    expect(fullMonths('2026-11-17', '2026-11-17')).toBe(0);
+    expect(fullMonths('2026-11-17', '2026-10-01')).toBe(0);
+    expect(fullMonths('17/11/2026', '2026-12-17')).toBe(0);
+  });
+});
+
+describe('earnedDays', () => {
+  it('gives one day per full month with 12 days a year (the default)', () => {
+    expect(earnedDays('2026-11-17', 12, '2027-02-17')).toBe(3);
+    expect(earnedDays('2026-11-17', undefined, '2027-02-17')).toBe(3);
+  });
+
+  it('rounds down to half days with other amounts', () => {
+    // 10 a year = 0.83 a month: 1 month -> 0.5, 2 months -> 1.5, 6 months -> 5
+    expect(earnedDays('2026-01-01', 10, '2026-02-01')).toBe(0.5);
+    expect(earnedDays('2026-01-01', 10, '2026-03-01')).toBe(1.5);
+    expect(earnedDays('2026-01-01', 10, '2026-07-01')).toBe(5);
+  });
+
+  it('earns nothing without a start date', () => {
+    expect(earnedDays(undefined, 12, '2027-02-17')).toBe(0);
+  });
+});
+
+describe('currentBalance', () => {
+  it('adds what was earned to the stored balance', () => {
+    const data = { vacaciones_disponibles: 7, acumulaDesde: '2026-11-17', diasAnuales: 12 };
+    expect(currentBalance(data, '2026-11-30')).toBe(7);
+    expect(currentBalance(data, '2027-01-17')).toBe(9);
+  });
+
+  it('keeps half days', () => {
+    expect(currentBalance({ vacaciones_disponibles: 9.5 }, '2027-01-17')).toBe(9.5);
+  });
+
+  it('is null when there is no balance on record', () => {
+    expect(currentBalance({ acumulaDesde: '2026-11-17' }, '2027-01-17')).toBeNull();
+    expect(currentBalance(undefined, '2027-01-17')).toBeNull();
+  });
+});
+
+describe('storedBalance', () => {
+  it('starts earning today the first time', () => {
+    expect(storedBalance(10, { nombre: 'Ana' }, '2026-11-17')).toEqual({
+      vacaciones_disponibles: 10,
+      acumulaDesde: '2026-11-17',
+    });
+  });
+
+  it('keeps the start date and subtracts what was already earned', () => {
+    const data = { vacaciones_disponibles: 7, acumulaDesde: '2026-11-17' };
+    // 2 months earned: the admin sets 15, so 13 is stored and 13 + 2 = 15.
+    expect(storedBalance(15, data, '2027-01-20')).toEqual({ vacaciones_disponibles: 13, acumulaDesde: '2026-11-17' });
   });
 });

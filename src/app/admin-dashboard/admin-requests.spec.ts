@@ -6,7 +6,11 @@ import {
   onVacationThisWeek,
   overtimeMinutes,
   overtimePay,
+  halfDayEnd,
+  halfDayText,
+  HALF_DAY_STARTS,
   paymentTotals,
+  returnDayText,
   upcomingHolidays,
   vacationDays,
 } from './admin-requests';
@@ -41,6 +45,22 @@ describe('admin requests', () => {
     // Christmas and New Year are mandatory holidays and are not deducted.
     expect(vacationDays(vacation('2026-12-22', '2027-01-04'))).toBe(7);
     expect(vacationDays(vacation('2026-12-02', '2026-12-03'))).toBe(1);
+  });
+
+  it('deducts 0.5 for a half day, only when it covers one working day', () => {
+    expect(vacationDays({ ...vacation('2026-12-02', '2026-12-03'), halfDayFrom: '07:00' })).toBe(0.5);
+    expect(vacationDays({ ...vacation('2026-12-14', '2026-12-21'), halfDayFrom: '07:00' })).toBe(5);
+  });
+
+  it('describes a 4-hour half day and when the worker is back', () => {
+    expect(HALF_DAY_STARTS[0]).toBe('00:00');
+    expect(HALF_DAY_STARTS.at(-1)).toBe('20:00');
+    expect(HALF_DAY_STARTS).toContain('07:30');
+    expect(halfDayEnd('07:30')).toBe('11:30');
+    expect(halfDayText('10:00')).toBe('de 10:00 a. m. a 2:00 p. m.');
+    const oneDay = vacation('2026-11-19', '2026-11-20');
+    expect(returnDayText({ ...oneDay, halfDayFrom: '07:00' })).toBe('jue 19 nov a las 11:00 a. m.');
+    expect(returnDayText(oneDay)).toBe('vie 20 nov');
   });
 
   it('sums overtime and groups the pay rate', () => {

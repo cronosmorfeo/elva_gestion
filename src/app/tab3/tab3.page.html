@@ -293,12 +293,10 @@
 
         </div>
 
-        <!-- DATOS DE PAGO -->
-        <!-- TODO: save these fields in a separate private document that only payroll can read. -->
+        <!-- DATOS DE PAGO (se guardan aparte, en colaboradores/{uid}/privado/pago) -->
         <div class="section-title">
           <ion-icon name="card-outline"></ion-icon>
           Datos de pago
-          <span class="pending-chip">Todavía no se guarda</span>
         </div>
 
         <div class="form-grid">
@@ -363,6 +361,33 @@
             }
           </div>
 
+        </div>
+
+        <!-- VACACIONES -->
+        <div class="section-title">
+          <ion-icon name="calendar-outline"></ion-icon>
+          Vacaciones
+        </div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <ion-label>Días de vacaciones que ya tiene</ion-label>
+
+            <ion-input
+              type="text"
+              inputmode="decimal"
+              placeholder="0"
+              fill="outline"
+              aria-label="Días de vacaciones que ya tiene"
+              [value]="vacacionesIniciales"
+              (ionInput)="cambiarVacaciones($event)">
+            </ion-input>
+            @if (vacacionesIniciales && !vacacionesValidas()) {
+              <p class="field-hint error">Escribí los días en números; pueden ser medios días (ej. 9,5).</p>
+            } @else {
+              <p class="field-hint">Desde hoy suma 1 día por cada mes trabajado (12 al año).</p>
+            }
+          </div>
         </div>
 
         <!-- CREDENCIALES -->

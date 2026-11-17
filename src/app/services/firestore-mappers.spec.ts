@@ -33,6 +33,12 @@ describe('toVacationRequest', () => {
     });
   });
 
+  it('reads a half day and ignores unknown values', () => {
+    expect(toVacationRequest('abc', { ...vacation, medioDiaDesde: '07:30' })?.halfDayFrom).toBe('07:30');
+    expect(toVacationRequest('abc', { ...vacation, medioDiaDesde: '22:00' })?.halfDayFrom).toBeUndefined();
+    expect(toVacationRequest('abc', { ...vacation, medioDiaDesde: 'manana' })?.halfDayFrom).toBeUndefined();
+  });
+
   it('keeps a valid estado and the uid, and treats an unknown estado as pending', () => {
     const r = toVacationRequest('abc', { ...vacation, estado: 'aprobada', uid: 'u1' });
     expect(r?.status).toBe('aprobada');

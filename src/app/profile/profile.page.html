@@ -41,12 +41,15 @@
     <section class="card profile-card" aria-labelledby="p-vac">
       <h2 id="p-vac">Vacaciones</h2>
       <dl class="profile-list">
-        <dt>Saldo registrado</dt>
-        <dd>{{ balance() === null ? 'Sin saldo registrado' : balance() + ' días' }}</dd>
+        <dt>Saldo</dt>
+        <dd>
+          {{ balanceText() }}
+          <span class="profile-note">Ya incluye los días que va ganando cada mes.</span>
+        </dd>
         <dt>Disponibles para pedir</dt>
         <dd>
-          {{ available() ?? '—' }} @if (pendingDays() > 0) {
-          <span class="profile-note">Ya se restaron {{ pendingDays() }} de solicitudes pendientes</span>
+          {{ availableText() }} @if (pendingDays() > 0) {
+          <span class="profile-note">Ya se restaron {{ pendingText() }} de solicitudes pendientes</span>
           }
         </dd>
       </dl>

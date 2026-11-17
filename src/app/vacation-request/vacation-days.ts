@@ -35,7 +35,7 @@ export function rangeLength(start: string, end: string): number | null {
 
 /**
  * Lists every day between start and end (inclusive) and whether it is deducted.
- * Weekends and mandatory holidays are not deducted; optional holidays are.
+ * Only working days are deducted: weekends and every holiday, mandatory or optional, are not (confirmed by HR).
  * Returns an empty list for invalid dates, end before start, or ranges longer than MAX_REQUEST_DAYS.
  */
 export function listVacationDays(start: string, end: string, holidays: Holiday[]): VacationDay[] {
@@ -61,7 +61,7 @@ export function listVacationDays(start: string, end: string, holidays: Holiday[]
       date,
       weekday,
       kind,
-      counts: kind === 'workday' || kind === 'optionalHoliday',
+      counts: kind === 'workday',
       holidayName: holiday?.name,
     });
   }

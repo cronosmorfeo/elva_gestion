@@ -113,9 +113,19 @@
           "descripcion": "false = no puede iniciar sesión"
         },
         "vacaciones_disponibles": {
-          "tipo": "number (entero)",
+          "tipo": "number (enteros o medios días)",
           "requerido": false,
-          "descripcion": "Saldo de vacaciones en días. Lo pone admin/rh en Editar empleado; se resta al aprobar y se devuelve al cancelar. Sin este campo, la persona no puede pedir vacaciones."
+          "descripcion": "Saldo ingresado menos lo usado. El saldo de hoy suma además los días ganados desde acumulaDesde. Se resta al aprobar y se devuelve al cancelar. Sin este campo, la persona no puede pedir vacaciones."
+        },
+        "acumulaDesde": {
+          "tipo": "fechaDia",
+          "requerido": false,
+          "descripcion": "Día desde el que gana días de vacaciones (cuando se ingresó su saldo en la página). Sin este campo no acumula."
+        },
+        "diasAnuales": {
+          "tipo": "number",
+          "requerido": false,
+          "descripcion": "Días de vacaciones que gana al año, uno por mes con 12 (por defecto 12)"
         },
         "uid": {
           "tipo": "string",
@@ -271,7 +281,12 @@
         "diasSolicitados": {
           "tipo": "number",
           "requerido": true,
-          "descripcion": "Días hábiles que se descuentan, calculados al pedir"
+          "descripcion": "Días hábiles que se descuentan, calculados al pedir (0.5 si es medio día)"
+        },
+        "medioDiaDesde": {
+          "tipo": "string \"HH:mm\"",
+          "requerido": false,
+          "descripcion": "Medio día de vacaciones: 4 horas desde esta hora (cada 30 min, de 00:00 a 20:00). Solo en solicitudes de un día hábil; diaFin es el día siguiente."
         },
         "comentarioRRHH": {
           "tipo": "string",

@@ -43,8 +43,11 @@ import {
   walletOutline,
 } from 'ionicons/icons';
 
+import { localIsoDate } from '../admin-dashboard/admin-dates';
 import { bankProblem } from '../services/bank-account';
 import { RequestsStore } from '../services/requests-store';
+import { DEFAULT_DAYS_PER_YEAR } from '../services/vacation-balance';
+import { parseDays } from '../shared/day-count';
 
 import {
   currencySymbol,
@@ -116,6 +119,8 @@ export class Tab3Page {
   horaFin = '';
   // Saved apart, in colaboradores/{uid}/privado/pago.
   pago = { cedula: '', iban: '', monedaCuenta: '' };
+  // Vacation days the person already has. From today they earn DEFAULT_DAYS_PER_YEAR a year.
+  vacacionesIniciales = '';
 
   // Shown in the success window after the employee is created.
   creado: { nombre: string; correo: string } | null = null;
@@ -188,6 +193,14 @@ export class Tab3Page {
     return isValidCrIban(this.pago.iban);
   }
 
+  cambiarVacaciones(event: Event): void {
+    this.vacacionesIniciales = String((event.target as HTMLIonInputElement).value ?? '').trim();
+  }
+
+  vacacionesValidas(): boolean {
+    return !this.vacacionesIniciales || parseDays(this.vacacionesIniciales) !== null;
+  }
+
   irAlPanel(): void {
     this.creado = null;
     void this.router.navigateByUrl('/tabs/dashboard');
@@ -238,6 +251,11 @@ export class Tab3Page {
       Number(this.colaborador.salario) < 0
     ) {
       alert('El salario no es válido.');
+      return;
+    }
+
+    if (!this.vacacionesValidas()) {
+      alert('Revisá los días de vacaciones: solo números, pueden ser medios días (ej. 9,5).');
       return;
     }
 
@@ -296,6 +314,10 @@ export class Tab3Page {
           correo: user.email,
           tipo_colaborador: 'regular',
           activo: true,
+          // Vacation days earned from today on: what they already had is entered here, so nothing counts twice.
+          vacaciones_disponibles: parseDays(this.vacacionesIniciales) ?? 0,
+          acumulaDesde: localIsoDate(new Date()),
+          diasAnuales: DEFAULT_DAYS_PER_YEAR,
           createdAt: serverTimestamp()
         }
       );
@@ -369,5 +391,6 @@ export class Tab3Page {
     this.horaInicio = '';
     this.horaFin = '';
     this.pago = { cedula: '', iban: '', monedaCuenta: '' };
+    this.vacacionesIniciales = '';
   }
 }

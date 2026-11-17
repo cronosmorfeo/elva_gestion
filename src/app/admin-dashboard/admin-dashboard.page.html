@@ -871,9 +871,9 @@
           <input
             id="edit-vacaciones"
             type="text"
-            inputmode="numeric"
-            placeholder="Ej. 12"
-            [attr.maxlength]="3"
+            inputmode="decimal"
+            placeholder="Ej. 12 o 9,5"
+            [attr.maxlength]="5"
             [attr.aria-invalid]="!!editState()?.vacationError"
             [value]="f.vacaciones"
             (input)="setEditVacation($event)"
@@ -882,10 +882,22 @@
           <span class="error-text">{{ editState()?.vacationError }}</span>
           } @else {
           <span class="muted"
-            >Se resta solo al aprobar vacaciones y se devuelve si el trabajador las cancela. Usalo para el saldo inicial
-            o para sumar los días que va ganando.</span
+            >Saldo de hoy. Desde que se guarda por primera vez, suma solo los días que va ganando cada mes. Se resta al
+            aprobar vacaciones y se devuelve si el trabajador las cancela.</span
           >
           }
+        </div>
+        <div class="edit-field">
+          <label for="edit-dias-ano">Días de vacaciones al año</label>
+          <input
+            id="edit-dias-ano"
+            type="text"
+            inputmode="numeric"
+            [attr.maxlength]="2"
+            [value]="f.diasAnuales"
+            (input)="setEditPerYear($event)"
+          />
+          <span class="muted">12 al año = 1 día por mes.</span>
         </div>
       </div>
 

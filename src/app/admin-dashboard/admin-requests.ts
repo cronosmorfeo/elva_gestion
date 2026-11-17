@@ -2,7 +2,7 @@ import { overtimeDays } from '../overtime-request/overtime-hours';
 import { costaRicaHolidays, holidaysBetween } from '../vacation-request/holidays';
 import { countDeductedDays, listVacationDays } from '../vacation-request/vacation-days';
 
-import { addDays } from './admin-dates';
+import { addDays, formatShortDate, formatTime } from './admin-dates';
 
 // 'cancelada': the worker cancelled it while it was pending. It is kept for the history.
 export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada';
@@ -19,6 +19,7 @@ export interface VacationRequest {
   ownerId?: string;
   email?: string;
   deductedDays?: number; // days taken from the balance when it was approved (returned if cancelled)
+  halfDayFrom?: string; // HH:mm: a half day off (4 hours from this time, one working day). Deducts 0.5
   reason?: string; // why it was rejected (the worker sees it)
   comment?: string;
   sentAt?: string; // YYYY-MM-DDTHH:mm
@@ -44,10 +45,41 @@ export interface UpcomingHoliday {
   mandatory: boolean;
 }
 
-// Days deducted from the balance: from the first day to the day before returning.
+// Days deducted from the balance: from the first day to the day before returning. A half day deducts 0.5.
 export function vacationDays(request: VacationRequest): number {
   const lastDay = addDays(request.returnDate, -1);
-  return countDeductedDays(listVacationDays(request.start, lastDay, holidaysBetween(request.start, lastDay)));
+  const days = countDeductedDays(listVacationDays(request.start, lastDay, holidaysBetween(request.start, lastDay)));
+  return request.halfDayFrom && days === 1 ? 0.5 : days;
+}
+
+// A half day is 4 hours. It can start every 30 minutes, at 8:00 p. m. at the latest, so it ends the same day.
+export const HALF_DAY_HOURS = 4;
+export const HALF_DAY_STARTS = Array.from(
+  { length: 41 },
+  (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`,
+);
+
+// "7:00 a. m." for HH:mm.
+export function timeLabel(time: string): string {
+  return formatTime(`0000-00-00T${time}`);
+}
+
+// HH:mm when a half day that starts at `from` ends.
+export function halfDayEnd(from: string): string {
+  const [h, m] = from.split(':').map(Number);
+  return `${String(h + HALF_DAY_HOURS).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// "de 7:00 a. m. a 11:00 a. m."
+export function halfDayText(from: string): string {
+  return `de ${timeLabel(from)} a ${timeLabel(halfDayEnd(from))}`;
+}
+
+// When the worker is back at work. After a half day, the same day when the 4 hours end.
+export function returnDayText(request: VacationRequest): string {
+  return request.halfDayFrom
+    ? `${formatShortDate(request.start)} a las ${timeLabel(halfDayEnd(request.halfDayFrom))}`
+    : formatShortDate(request.returnDate);
 }
 
 export function overtimeMinutes(request: OvertimeRequest): number {

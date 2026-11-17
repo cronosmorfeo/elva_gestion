@@ -55,6 +55,7 @@ import {
   balanceAfterCancel,
   canCancel,
   checkBalance,
+  currentBalance,
   deductedDays,
 } from './vacation-balance';
 
@@ -70,7 +71,7 @@ export class RequestsStore {
   readonly notices = signal<Notice[]>([]);
   readonly reports = signal<WorkReport[]>([]);
   readonly loadError = signal(false);
-  // The signed-in person's vacation balance (colaboradores.vacaciones_disponibles), live. null = not on record.
+  // The signed-in person's vacation balance today (stored + earned since acumulaDesde), live. null = not on record.
   readonly myBalance = signal<number | null>(null);
   // The signed-in person's own data (colaboradores/{uid}), live, for "Mi perfil".
   readonly myProfile = signal<Profile | null>(null);
@@ -134,8 +135,7 @@ export class RequestsStore {
     const stopBalance = onSnapshot(
       doc(db, 'colaboradores', uid),
       (snap) => {
-        const balance: unknown = snap.data()?.['vacaciones_disponibles'];
-        this.myBalance.set(typeof balance === 'number' ? balance : null);
+        this.myBalance.set(currentBalance(snap.data(), localDateTime(new Date()).slice(0, 10)));
         this.myProfile.set(toProfile(snap.data()));
       },
       (err) => console.error('[RequestsStore] Could not read my profile:', err),
@@ -231,9 +231,13 @@ export class RequestsStore {
       if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
       const ownerRef = ownerUid ? doc(db, 'colaboradores', ownerUid) : null;
       const owner = ownerRef ? await tx.get(ownerRef) : null;
-      const check = checkBalance(owner?.data()?.['vacaciones_disponibles'], days);
+      const ownerData = owner?.data();
+      const check = checkBalance(currentBalance(ownerData, localDateTime(new Date()).slice(0, 10)), days);
       if (check.kind === 'insuficiente') throw new ApproveError('insuficiente', check.balance);
-      if (ownerRef && check.kind === 'descontar') tx.update(ownerRef, { vacaciones_disponibles: check.next });
+      // The stored part goes down; what was earned since acumulaDesde keeps being added on top.
+      if (ownerRef && check.kind === 'descontar') {
+        tx.update(ownerRef, { vacaciones_disponibles: (ownerData?.['vacaciones_disponibles'] as number) - days });
+      }
       const deducted = check.kind === 'descontar' ? days : 0;
       tx.update(requestRef, {
         estado: 'aprobada',

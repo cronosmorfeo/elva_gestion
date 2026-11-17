@@ -1,8 +1,9 @@
 import { addDays, formatShortDate, formatTime } from '../admin-dashboard/admin-dates';
 import type { OvertimeRequest, VacationRequest } from '../admin-dashboard/admin-requests';
-import { upcomingHolidays, vacationDays } from '../admin-dashboard/admin-requests';
+import { halfDayText, returnDayText, upcomingHolidays, vacationDays } from '../admin-dashboard/admin-requests';
 import type { WorkReport } from '../reports/report-utils';
 import { mondayOf } from '../reports/report-utils';
+import { dayCount } from '../shared/day-count';
 
 export type UpcomingKind = 'vacaciones' | 'horas' | 'feriado';
 
@@ -64,8 +65,10 @@ export function upcomingItems(
       kind: 'vacaciones',
       title: now ? 'De vacaciones' : 'Vacaciones',
       detail: now
-        ? `Vuelve el ${formatShortDate(r.returnDate)}`
-        : `Del ${formatShortDate(r.start)} al ${formatShortDate(lastDay)} · ${days} ${days === 1 ? 'día' : 'días'}`,
+        ? `Vuelve el ${returnDayText(r)}`
+        : r.halfDayFrom
+          ? `Medio día, ${halfDayText(r.halfDayFrom)}`
+          : `Del ${formatShortDate(r.start)} al ${formatShortDate(lastDay)} · ${dayCount(days)}`,
     });
   }
   for (const r of overtime) {

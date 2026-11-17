@@ -8,6 +8,7 @@ import type { Worker } from '../services/current-worker';
 import { RequestsStore } from '../services/requests-store';
 import type { CancelResult } from '../services/vacation-balance';
 import { canCancel } from '../services/vacation-balance';
+import { dayCount } from '../shared/day-count';
 
 import type { RequestKind } from './my-requests-utils';
 import { defaultMonth, inMonth, monthOptions, overtimeRows, vacationRows } from './my-requests-utils';
@@ -110,7 +111,7 @@ function confirmText(status: string, returnDays: number, kind: RequestKind): str
   if (status !== 'aprobada') return '¿Seguro que quiere cancelar esta solicitud?';
   const back =
     kind === 'vacaciones' && returnDays
-      ? `Se le ${returnDays === 1 ? 'devuelve 1 día' : `devuelven ${returnDays} días`} de vacaciones y se le avisa a la administración.`
+      ? `Se le ${returnDays === 1 ? 'devuelve' : 'devuelven'} ${dayCount(returnDays)} de vacaciones y se le avisa a la administración.`
       : 'Se le avisa a la administración.';
   return `Esta solicitud ya está aprobada. ${back} ¿Seguro que quiere cancelarla?`;
 }
@@ -120,7 +121,7 @@ function cancelMessage(result: CancelResult): string {
   if (result.kind !== 'cancelada') return 'No se pudo cancelar: la administración ya la había decidido.';
   if (!result.wasApproved) return 'Solicitud cancelada.';
   const back = result.returnedDays
-    ? ` Se le ${result.returnedDays === 1 ? 'devolvió 1 día' : `devolvieron ${result.returnedDays} días`}.`
+    ? ` Se le ${result.returnedDays === 1 ? 'devolvió' : 'devolvieron'} ${dayCount(result.returnedDays)}.`
     : '';
   return `Solicitud cancelada y la administración ya fue avisada.${back}`;
 }

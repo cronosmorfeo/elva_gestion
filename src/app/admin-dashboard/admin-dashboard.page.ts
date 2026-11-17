@@ -12,7 +12,14 @@ import { bankProblem, updatedText } from '../services/bank-account';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 import type { ApproveResult } from '../services/vacation-balance';
-import { ApproveError, approveProblemText } from '../services/vacation-balance';
+import {
+  ApproveError,
+  DEFAULT_DAYS_PER_YEAR,
+  approveProblemText,
+  currentBalance,
+  storedBalance,
+} from '../services/vacation-balance';
+import { dayCount, dayNumber, parseDays } from '../shared/day-count';
 import { COUNTRY_OPTIONS, CURRENCY_OPTIONS, ROLE_OPTIONS, SCHEDULES, roleLabel } from '../shared/employee-labels';
 import {
   currencySymbol,
@@ -43,11 +50,13 @@ import {
   formatColones,
   formatHours,
   formatIban,
+  halfDayText,
   maskIban,
   onVacationThisWeek,
   overtimeMinutes,
   overtimePay,
   paymentTotals,
+  returnDayText,
   upcomingHolidays,
   vacationDays,
 } from './admin-requests';
@@ -70,7 +79,9 @@ interface Employee {
   salario: number | null;
   moneda: string;
   pais: string;
-  vacationBalance: number | null;
+  vacationBalance: number | null; // today's balance: stored + earned since accrualFrom
+  accrualFrom?: string; // colaboradores.acumulaDesde
+  daysPerYear: number; // colaboradores.diasAnuales
 }
 
 interface EditForm {
@@ -88,6 +99,7 @@ interface EditForm {
   horaInicio: string;
   horaFin: string;
   vacaciones: string; // vacation balance as typed; '' = not on record
+  diasAnuales: string; // vacation days earned per year
   activo: boolean;
   cedula: string;
   iban: string;
@@ -274,8 +286,10 @@ export class AdminDashboardPage {
         employee: r.employee,
         balance: balanceText(r, this.employees()),
         start: formatShortDate(r.start),
-        returnDate: formatShortDate(r.returnDate),
-        days: vacationDays(r),
+        returnDate: returnDayText(r),
+        days: r.halfDayFrom
+          ? `${dayNumber(vacationDays(r))} (${halfDayText(r.halfDayFrom)})`
+          : dayNumber(vacationDays(r)),
         rhReviewed: r.rhReviewed,
         canDecide: r.status === 'pendiente' && r.rhReviewed,
         waiting: r.status === 'pendiente' && !r.rhReviewed,
@@ -329,7 +343,7 @@ export class AdminDashboardPage {
     onVacationThisWeek(this.vacations(), this.today()).map((r) => ({
       id: r.id,
       employee: r.employee,
-      until: `vuelve el ${formatShortDate(r.returnDate)}`,
+      until: `vuelve el ${returnDayText(r)}`,
     })),
   );
 
@@ -361,7 +375,7 @@ export class AdminDashboardPage {
         ? hadBalance
           ? 'Escribí los días de vacaciones (puede ser 0).'
           : ''
-        : vacationProblem(f.vacaciones);
+        : vacationProblem(f.vacaciones) || perYearProblem(f.diasAnuales);
     const changed = JSON.stringify(f) !== this.editOriginal();
     return {
       symbol: currencySymbol(f.moneda),
@@ -676,7 +690,8 @@ export class AdminDashboardPage {
       jornada: e.jornada,
       horaInicio: times?.start ?? '',
       horaFin: times?.end ?? '',
-      vacaciones: e.vacationBalance === null ? '' : String(e.vacationBalance),
+      vacaciones: e.vacationBalance === null ? '' : dayNumber(e.vacationBalance),
+      diasAnuales: String(e.daysPerYear),
       activo: e.active,
       cedula: '',
       iban: '',
@@ -753,9 +768,16 @@ export class AdminDashboardPage {
 
   setEditVacation(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const vacaciones = input.value.replace(/\D/g, '').slice(0, 3);
+    const vacaciones = input.value.replace(/[^\d.,]/g, '').slice(0, 5);
     input.value = vacaciones;
     this.editing.update((f) => (f ? { ...f, vacaciones } : f));
+  }
+
+  setEditPerYear(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const diasAnuales = input.value.replace(/\D/g, '').slice(0, 2);
+    input.value = diasAnuales;
+    this.editing.update((f) => (f ? { ...f, diasAnuales } : f));
   }
 
   setEditActive(event: Event): void {
@@ -797,6 +819,8 @@ export class AdminDashboardPage {
     const f = this.editing();
     if (!f || !this.editState()?.canSave) return;
     const horario = scheduleText(f.horaInicio, f.horaFin);
+    const before = JSON.parse(this.editOriginal()) as EditForm;
+    const employee = this.employees().find((e) => e.id === f.id);
     const changes = {
       nombre: f.nombre.trim(),
       tipo_colaborador: f.tipo,
@@ -807,14 +831,24 @@ export class AdminDashboardPage {
       jornada: f.jornada,
       horarioLaborado: horario,
       activo: f.activo,
-      // Only saved when it has a value, so employees without a balance stay that way.
-      ...(f.vacaciones === '' ? {} : { vacaciones_disponibles: Number(f.vacaciones) }),
+      // The balance is only saved when it changed, so it never undoes an approval made meanwhile,
+      // and employees without a balance stay that way. Earning starts the first time it is saved.
+      ...(f.vacaciones !== '' &&
+      (f.vacaciones !== before.vacaciones || f.diasAnuales !== before.diasAnuales || !employee?.accrualFrom)
+        ? {
+            ...storedBalance(
+              parseDays(f.vacaciones) ?? 0,
+              { acumulaDesde: employee?.accrualFrom, diasAnuales: Number(f.diasAnuales) },
+              localIsoDate(new Date()),
+            ),
+            diasAnuales: Number(f.diasAnuales),
+          }
+        : {}),
     };
     this.editSaving.set(true);
     this.editError.set('');
     let bankChanged = false;
     try {
-      const before = JSON.parse(this.editOriginal()) as EditForm;
       bankChanged = before.cedula !== f.cedula || before.iban !== f.iban || before.monedaCuenta !== f.monedaCuenta;
       await updateDoc(doc(getFirestore(), 'colaboradores', f.id), { ...changes, updatedAt: serverTimestamp() });
       if (bankChanged) {
@@ -837,7 +871,8 @@ export class AdminDashboardPage {
                 salario: changes.salario,
                 moneda: changes.moneda,
                 pais: changes.pais,
-                vacationBalance: f.vacaciones === '' ? e.vacationBalance : Number(f.vacaciones),
+                vacationBalance: f.vacaciones === '' ? e.vacationBalance : parseDays(f.vacaciones),
+                daysPerYear: Number(f.diasAnuales),
               }
             : e,
         ),
@@ -937,6 +972,7 @@ export class AdminDashboardPage {
     const stop = onSnapshot(
       collection(getFirestore(), 'colaboradores'),
       (snap) => {
+        const today = localIsoDate(new Date());
         const list = snap.docs.map((d) => {
           const data = d.data();
           return {
@@ -954,7 +990,9 @@ export class AdminDashboardPage {
             salario: typeof data['salario'] === 'number' ? data['salario'] : null,
             moneda: String(data['moneda'] ?? ''),
             pais: String(data['pais'] ?? ''),
-            vacationBalance: typeof data['vacaciones_disponibles'] === 'number' ? data['vacaciones_disponibles'] : null,
+            vacationBalance: currentBalance(data, today),
+            accrualFrom: typeof data['acumulaDesde'] === 'string' ? data['acumulaDesde'] : undefined,
+            daysPerYear: typeof data['diasAnuales'] === 'number' ? data['diasAnuales'] : DEFAULT_DAYS_PER_YEAR,
           };
         });
         list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
@@ -991,10 +1029,12 @@ function ownerOf(request: VacationRequest, employees: Employee[]): Employee | un
 
 // Whole days, from 0 to 365. '' means it was left empty.
 function vacationProblem(value: string): string {
-  if (!/^\d{1,3}$/.test(value)) return 'Escribí solo números enteros.';
-  return Number(value) > 365 ? 'No puede ser más de 365 días.' : '';
+  const days = parseDays(value);
+  if (days === null) return 'Escribí los días en números; pueden ser medios días (ej. 9,5).';
+  return days > 365 ? 'No puede ser más de 365 días.' : '';
 }
 
-function dayCount(n: number): string {
-  return `${n} ${n === 1 ? 'día' : 'días'}`;
+function perYearProblem(value: string): string {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= 30 ? '' : 'Los días al año van de 1 a 30.';
 }

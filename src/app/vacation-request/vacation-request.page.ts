@@ -4,8 +4,11 @@ import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- Añadido collection, addDoc, serverTimestamp
 
+import { addDays } from '../admin-dashboard/admin-dates';
+import { HALF_DAY_STARTS, halfDayEnd, halfDayText, timeLabel } from '../admin-dashboard/admin-requests';
 import { localDateTime } from '../notices/notice-utils';
 import { RequestsStore } from '../services/requests-store';
+import { dayCount, dayNumber } from '../shared/day-count';
 
 import { holidaysBetween } from './holidays';
 import type { VacationDay } from './vacation-days';
@@ -28,6 +31,8 @@ export class VacationRequestPage implements OnInit {
   // Live from Firestore: saved balance minus the requests still pending (see RequestsStore).
   readonly hasBalance = computed(() => this.store.myAvailableDays() !== null);
   readonly availableDays = computed(() => this.store.myAvailableDays() ?? 0);
+  readonly availableDaysText = computed(() => dayNumber(this.availableDays()));
+  readonly pendingText = computed(() => dayCount(this.store.myPendingVacationDays()));
   readonly userEmail = signal<string | null>(null);
   readonly userName = signal<string>('Andrey Rojas'); // Para almacenar el nombre del colaborador
 
@@ -36,11 +41,16 @@ export class VacationRequestPage implements OnInit {
   readonly end = signal('');
   readonly comment = signal('');
   readonly sending = signal(false);
+  // Same first day and return day = a half day (4 hours) starting at halfDayFrom.
+  readonly halfDayFrom = signal('');
+  readonly halfDayStarts = HALF_DAY_STARTS.map((value) => ({ value, label: timeLabel(value) }));
+  readonly sameDay = computed(() => this.start() !== '' && this.end() === this.start());
 
   // Helper to get the actual last vacation day (the day before the return date)
   private readonly lastVacationDay = computed(() => {
     const returnDateStr = this.end();
     if (!returnDateStr) return '';
+    if (this.sameDay()) return this.start();
     const date = new Date(returnDateStr + 'T00:00:00');
     if (isNaN(date.getTime())) return '';
     date.setDate(date.getDate() - 1);
@@ -53,9 +63,19 @@ export class VacationRequestPage implements OnInit {
     if (!this.start() || !lastDay || this.tooLong()) return [];
     return listVacationDays(this.start(), lastDay, holidaysBetween(this.start(), lastDay));
   });
-  readonly deducted = computed(() => countDeductedDays(this.days()));
+  readonly isHalfDay = computed(() => this.sameDay() && countDeductedDays(this.days()) === 1);
+  readonly halfDayHint = computed(() => {
+    const from = this.halfDayFrom();
+    return from ? `No trabaja ${halfDayText(from)}. Vuelve a trabajar a las ${timeLabel(halfDayEnd(from))}.` : '';
+  });
+  readonly deducted = computed(() => (this.isHalfDay() ? 0.5 : countDeductedDays(this.days())));
   readonly remaining = computed(() => this.availableDays() - this.deducted());
-  readonly dayRows = computed(() => this.days().map((day) => toRow(day)));
+  readonly dayRows = computed(() =>
+    this.days().map((day) => {
+      const row = toRow(day);
+      return this.isHalfDay() && day.counts ? { ...row, status: 'Medio día · se descuenta 0,5' } : row;
+    }),
+  );
   readonly balanceLabel = computed(() => (this.remaining() < 0 ? 'Le faltarían' : 'Le quedarían'));
   readonly deductedText = computed(() => dayCount(this.deducted()));
   readonly balanceText = computed(() => dayCount(Math.abs(this.remaining())));
@@ -64,15 +84,16 @@ export class VacationRequestPage implements OnInit {
     if (!this.start() || !this.end()) return '';
     if (this.start() < this.minStart) return 'El primer día no puede ser una fecha pasada.';
     if (this.end() < this.start()) return 'La fecha de reincorporación no puede ser antes del primer día.';
-    if (this.end() === this.start()) return 'La fecha de reincorporación debe ser posterior al primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';
     if (this.deducted() === 0) return 'Las fechas elegidas no incluyen días laborales.';
     if (!this.hasBalance()) return 'Todavía no tiene días de vacaciones registrados. Consulte con RH.';
-    if (this.remaining() < 0) return `Solo tiene ${this.availableDays()} días disponibles.`;
+    if (this.remaining() < 0) return `Solo tiene ${dayCount(this.availableDays())} disponibles.`;
     return '';
   });
 
-  readonly canSubmit = computed(() => this.days().length > 0 && !this.error());
+  readonly canSubmit = computed(
+    () => this.days().length > 0 && !this.error() && (!this.isHalfDay() || this.halfDayFrom() !== ''),
+  );
 
   async ngOnInit(): Promise<void> {
     console.log('[VacationRequest] ngOnInit: Obteniendo colaborador actual desde el store...');
@@ -128,6 +149,10 @@ export class VacationRequestPage implements OnInit {
     this.comment.set(value ?? '');
   }
 
+  setHalfDayFrom(value: string): void {
+    this.halfDayFrom.set(HALF_DAY_STARTS.includes(value) ? value : '');
+  }
+
   async submit(): Promise<void> {
     if (!this.canSubmit() || this.sending()) return;
     this.sending.set(true);
@@ -145,11 +170,13 @@ export class VacationRequestPage implements OnInit {
         fechaSolicitud: serverTimestamp(),
         diasSolicitados: this.deducted(),
         diaInicio: this.start(),
-        diaFin: this.end(), // Corresponde al día de reincorporación seleccionado
+        // Día de reincorporación. El medio día (mismo día) se guarda como un día con medioDiaDesde.
+        diaFin: this.sameDay() ? addDays(this.start(), 1) : this.end(),
         comentarioRRHH: this.comment() || '',
         nombreSolicitante: (worker as any).name || this.userName(),
         correoSolicitante: this.userEmail() || (worker as any).correo || '',
         uid: worker.uid,
+        ...(this.isHalfDay() ? { medioDiaDesde: this.halfDayFrom() } : {}),
       };
 
       await addDoc(requestsRef, vacationRequestData);
@@ -170,6 +197,7 @@ export class VacationRequestPage implements OnInit {
     this.start.set('');
     this.end.set('');
     this.comment.set('');
+    this.halfDayFrom.set('');
     const toast = await this.toast.create({
       message: `Solicitud de ${days} enviada. Puede verla en Mis solicitudes.`,
       duration: 5000,
@@ -184,21 +212,17 @@ function toRow(day: VacationDay): { key: string; kind: string; weekday: string; 
   const month = MONTHS.at(Number(day.date.slice(5, 7)) - 1) ?? '';
   const status =
     day.kind === 'weekend'
-      ? 'Descanso'
+      ? 'Descanso · no se descuenta'
       : day.kind === 'mandatoryHoliday'
-        ? `Feriado: ${day.holidayName}`
+        ? `Feriado: ${day.holidayName} · no se descuenta`
         : day.kind === 'optionalHoliday'
-          ? `Cuenta (${day.holidayName})`
-          : 'Cuenta';
+          ? `Feriado no obligatorio: ${day.holidayName} · no se descuenta`
+          : 'Se descuenta';
   return {
     key: day.date,
-    kind: day.kind,
+    kind: day.counts ? 'counted' : 'free',
     weekday: WEEKDAYS.at(day.weekday) ?? '',
     date: `${Number(day.date.slice(8))} ${month}`,
     status,
   };
-}
-
-function dayCount(n: number): string {
-  return `${n} ${n === 1 ? 'día' : 'días'}`;
 }

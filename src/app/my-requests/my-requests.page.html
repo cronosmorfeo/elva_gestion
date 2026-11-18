@@ -3,6 +3,7 @@
     <h1>Mis solicitudes</h1>
     <p class="intro">Acá ve las solicitudes que envió y si la administración las aprobó o las rechazó.</p>
 
+    @if (flags().horasExtra) {
     <div class="filter" role="group" aria-label="Tipo de solicitud">
       <button
         type="button"
@@ -21,8 +22,7 @@
         Horas extra <span class="count">{{ overtime().length }}</span>
       </button>
     </div>
-
-    @if (!loading() && months().length > 1) {
+    } @if (!loading() && months().length > 1) {
     <label class="field month-field">
       <span>Mes</span>
       <select [value]="month()" (change)="setMonth($event)">

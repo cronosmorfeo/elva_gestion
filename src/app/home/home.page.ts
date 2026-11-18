@@ -4,6 +4,7 @@ import { IonContent } from '@ionic/angular';
 
 import { formatLongDate, localIsoDate } from '../admin-dashboard/admin-dates';
 import { mondayOf, weekLabel } from '../reports/report-utils';
+import { FeatureFlagsService } from '../services/feature-flags';
 import { RequestsStore } from '../services/requests-store';
 import { dayNumber } from '../shared/day-count';
 
@@ -17,6 +18,9 @@ import { chipDay, chipMonth, firstName, greeting, pendingCount, reportSentThisWe
 })
 export class HomePage {
   private readonly store = inject(RequestsStore);
+  readonly flags = inject(FeatureFlagsService).flags;
+  // Overtime is left out of the summary while it is turned off.
+  private readonly overtime = computed(() => (this.flags().horasExtra ? this.store.overtime() : []));
 
   readonly name = signal('');
   readonly now = signal(new Date());
@@ -29,7 +33,7 @@ export class HomePage {
     const available = this.available();
     return available === null ? '—' : dayNumber(available);
   });
-  readonly pending = computed(() => pendingCount(this.store.vacations(), this.store.overtime(), this.store.myUid()));
+  readonly pending = computed(() => pendingCount(this.store.vacations(), this.overtime(), this.store.myUid()));
   readonly unseenNotices = this.store.unseenNotices;
   readonly latestNotice = computed(() => this.store.sortedNotices().at(0)?.title ?? 'No hay avisos');
   readonly pendingText = computed(() => {
@@ -39,7 +43,7 @@ export class HomePage {
   readonly reportSent = computed(() => reportSentThisWeek(this.store.reports(), this.store.myUid(), this.today()));
   readonly weekText = computed(() => weekLabel(mondayOf(this.today())));
   readonly upcoming = computed(() =>
-    upcomingItems(this.store.vacations(), this.store.overtime(), this.store.myUid(), this.today()).map((item) => ({
+    upcomingItems(this.store.vacations(), this.overtime(), this.store.myUid(), this.today()).map((item) => ({
       ...item,
       day: chipDay(item.date),
       month: chipMonth(item.date),

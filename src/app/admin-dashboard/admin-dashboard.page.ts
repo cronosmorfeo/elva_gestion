@@ -9,6 +9,8 @@ import { MAX_NOTICE_MESSAGE, MAX_NOTICE_TITLE, noticeProblem } from '../notices/
 import { fileKind, formatFileSize, unseenCount, weekLabel } from '../reports/report-utils';
 import { AuthService } from '../services/auth';
 import { bankProblem, updatedText } from '../services/bank-account';
+import type { FeatureFlag } from '../services/feature-flags';
+import { FeatureFlagsService } from '../services/feature-flags';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 import type { ApproveResult } from '../services/vacation-balance';
@@ -60,7 +62,7 @@ import {
   upcomingHolidays,
   vacationDays,
 } from './admin-requests';
-import { MAX_REASON, reasonProblem, vacationConflicts } from './decisions';
+import { MAX_REASON, isJefatura, jefaturaText, reasonProblem, vacationConflicts } from './decisions';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
@@ -82,6 +84,7 @@ interface Employee {
   vacationBalance: number | null; // today's balance: stored + earned since accrualFrom
   accrualFrom?: string; // colaboradores.acumulaDesde
   daysPerYear: number; // colaboradores.diasAnuales
+  inactiveSince: string; // 'Desde mié 18 nov' when colaboradores.desactivadoEl is on record
 }
 
 interface EditForm {
@@ -101,6 +104,7 @@ interface EditForm {
   vacaciones: string; // vacation balance as typed; '' = not on record
   diasAnuales: string; // vacation days earned per year
   activo: boolean;
+  locked: boolean; // already deactivated: a deactivated account is never reactivated
   cedula: string;
   iban: string;
   monedaCuenta: string;
@@ -109,13 +113,14 @@ interface EditForm {
 type EditField =
   'nombre' | 'tipo' | 'pais' | 'fechaIngreso' | 'moneda' | 'jornada' | 'horaInicio' | 'horaFin' | 'monedaCuenta';
 
-const SECTIONS = [
+// A section with a flag only shows while that feature flag is on.
+const SECTIONS: { id: string; label: string; flag?: FeatureFlag }[] = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'vacaciones', label: 'Vacaciones' },
-  { id: 'horas-extra', label: 'Horas extra' },
-  { id: 'pagos', label: 'Pagos pendientes' },
+  { id: 'horas-extra', label: 'Horas extra', flag: 'horasExtra' },
+  { id: 'pagos', label: 'Pagos pendientes', flag: 'pagos' },
   { id: 'empleados', label: 'Empleados' },
-  { id: 'avisos', label: 'Avisos' },
+  { id: 'avisos', label: 'Avisos', flag: 'avisos' },
 ];
 
 const STATUS_TABS: { id: RequestStatus; label: string }[] = [
@@ -142,9 +147,11 @@ export class AdminDashboardPage {
   private readonly toast = inject(ToastController);
   private readonly store = inject(RequestsStore);
   private readonly notifications = inject(NotificationsService);
+  private readonly featureFlags = inject(FeatureFlagsService);
 
   readonly notifyState = this.notifications.state;
-  readonly sections = SECTIONS;
+  readonly flags = this.featureFlags.flags;
+  readonly sections = computed(() => SECTIONS.filter((s) => !s.flag || this.flags()[s.flag]));
   readonly roleOptions = ROLE_OPTIONS;
   readonly countryOptions = COUNTRY_OPTIONS;
   readonly currencyOptions = CURRENCY_OPTIONS;
@@ -158,6 +165,8 @@ export class AdminDashboardPage {
 
   readonly profileName = signal('');
   readonly profileRole = signal('');
+  // Only the jefatura (role admin) approves or rejects vacations; RH sees them.
+  readonly jefatura = signal(false);
   readonly profileInitials = computed(() => initials(this.profileName() || 'Admin'));
 
   // Live from Firestore, shared with the worker pages, so decisions show up in "Mis solicitudes".
@@ -173,6 +182,7 @@ export class AdminDashboardPage {
     return f ? noticeProblem(f) : '';
   });
   readonly confirmDeleteId = signal<string | null>(null);
+  readonly confirmDeactivate = signal(false);
   readonly noticeRows = computed(() =>
     this.store.sortedNotices().map((n) => ({
       ...n,
@@ -265,10 +275,9 @@ export class AdminDashboardPage {
     const approvedVac = vac.filter((r) => r.status === 'aprobada');
     const pendingOt = ot.filter((r) => r.status === 'pendiente');
     const approvedOt = ot.filter((r) => r.status === 'aprobada');
-    const waitingRh = pendingVac.filter((r) => !r.rhReviewed).length;
     return {
       pendingVacations: pendingVac.length,
-      waitingRh: waitingRh === 1 ? '1 espera revisión de RH' : `${waitingRh} esperan revisión de RH`,
+      waitingJefatura: pendingVac.length === 1 ? 'espera a la jefatura' : 'esperan a la jefatura',
       approvedVacations: approvedVac.length,
       approvedVacationDays: dayCount(approvedVac.reduce((sum, r) => sum + vacationDays(r), 0)),
       pendingOvertime: pendingOt.length,
@@ -290,9 +299,9 @@ export class AdminDashboardPage {
         days: r.halfDayFrom
           ? `${dayNumber(vacationDays(r))} (${halfDayText(r.halfDayFrom)})`
           : dayNumber(vacationDays(r)),
-        rhReviewed: r.rhReviewed,
-        canDecide: r.status === 'pendiente' && r.rhReviewed,
-        waiting: r.status === 'pendiente' && !r.rhReviewed,
+        jefatura: jefaturaText(r.status, this.employees().find((e) => e.id === r.decidedBy)?.name ?? ''),
+        canDecide: r.status === 'pendiente' && this.jefatura(),
+        waiting: r.status === 'pendiente' && !this.jefatura(),
         status: r.status,
         conflicts: r.status === 'pendiente' ? vacationConflicts(r, this.vacations()).join(', ') : '',
         reason: r.reason ?? '',
@@ -390,8 +399,8 @@ export class AdminDashboardPage {
       canSave:
         missing.length === 0 &&
         !vacationError &&
-        this.editBank() === 'ready' &&
-        !bankProblem(f.cedula, f.iban, f.monedaCuenta) &&
+        // Payment data is hidden (and not checked) while the pagos flag is off.
+        (!this.flags().pagos || (this.editBank() === 'ready' && !bankProblem(f.cedula, f.iban, f.monedaCuenta))) &&
         changed &&
         !this.editSaving(),
       changed,
@@ -409,6 +418,7 @@ export class AdminDashboardPage {
   constructor() {
     const destroyRef = inject(DestroyRef);
     this.scheduleMidnight(destroyRef);
+    void this.featureFlags.load();
     void this.loadProfile();
     this.watchEmployees(destroyRef);
   }
@@ -438,7 +448,7 @@ export class AdminDashboardPage {
 
   async decideVacation(id: string, status: RequestStatus): Promise<void> {
     const request = this.vacations().find((r) => r.id === id);
-    if (!request) return;
+    if (!request || !this.jefatura()) return;
     if (status === 'rechazada') {
       this.openReject('vacaciones', id, request.employee);
       return;
@@ -693,6 +703,7 @@ export class AdminDashboardPage {
       vacaciones: e.vacationBalance === null ? '' : dayNumber(e.vacationBalance),
       diasAnuales: String(e.daysPerYear),
       activo: e.active,
+      locked: !e.active,
       cedula: '',
       iban: '',
       monedaCuenta: '',
@@ -758,6 +769,7 @@ export class AdminDashboardPage {
   closeEdit(): void {
     const id = this.editing()?.id;
     this.editing.set(null);
+    this.confirmDeactivate.set(false);
     if (id) setTimeout(() => document.getElementById(`edit-${id}`)?.focus());
   }
 
@@ -780,9 +792,20 @@ export class AdminDashboardPage {
     this.editing.update((f) => (f ? { ...f, diasAnuales } : f));
   }
 
+  // Turning the switch off asks first: a deactivated account cannot be reactivated.
   setEditActive(event: Event): void {
-    const checked = (event.target as HTMLInputElement).checked;
-    this.editing.update((f) => (f ? { ...f, activo: checked } : f));
+    const input = event.target as HTMLInputElement;
+    if (!input.checked) {
+      input.checked = true;
+      this.confirmDeactivate.set(true);
+      return;
+    }
+    this.editing.update((f) => (f ? { ...f, activo: true } : f));
+  }
+
+  answerDeactivate(yes: boolean): void {
+    this.confirmDeactivate.set(false);
+    if (yes) this.editing.update((f) => (f ? { ...f, activo: false } : f));
   }
 
   setEditSalary(event: Event): void {
@@ -830,7 +853,8 @@ export class AdminDashboardPage {
       moneda: f.moneda,
       jornada: f.jornada,
       horarioLaborado: horario,
-      activo: f.activo,
+      activo: f.activo && !f.locked,
+      ...(before.activo && !f.activo ? { desactivadoEl: localIsoDate(new Date()) } : {}),
       // The balance is only saved when it changed, so it never undoes an approval made meanwhile,
       // and employees without a balance stay that way. Earning starts the first time it is saved.
       ...(f.vacaciones !== '' &&
@@ -864,6 +888,9 @@ export class AdminDashboardPage {
                 schedule: SCHEDULES[changes.jornada] ?? '—',
                 startDate: formatShortDate(changes.fechaIngreso),
                 active: changes.activo,
+                inactiveSince: changes.desactivadoEl
+                  ? `Desde ${formatShortDate(changes.desactivadoEl)}`
+                  : e.inactiveSince,
                 tipo: changes.tipo_colaborador,
                 jornada: changes.jornada,
                 horario,
@@ -962,6 +989,7 @@ export class AdminDashboardPage {
       const data = (await getDoc(doc(getFirestore(), 'colaboradores', user.uid))).data();
       this.profileName.set(String(data?.['nombre'] ?? user.displayName ?? ''));
       this.profileRole.set(roleLabel(data?.['tipo_colaborador']));
+      this.jefatura.set(isJefatura(data?.['tipo_colaborador']));
     } catch {
       this.profileName.set(user.displayName ?? '');
     }
@@ -993,6 +1021,10 @@ export class AdminDashboardPage {
             vacationBalance: currentBalance(data, today),
             accrualFrom: typeof data['acumulaDesde'] === 'string' ? data['acumulaDesde'] : undefined,
             daysPerYear: typeof data['diasAnuales'] === 'number' ? data['diasAnuales'] : DEFAULT_DAYS_PER_YEAR,
+            inactiveSince:
+              data['activo'] !== true && typeof data['desactivadoEl'] === 'string'
+                ? `Desde ${formatShortDate(data['desactivadoEl'])}`
+                : '',
           };
         });
         list.sort((a, b) => a.name.localeCompare(b.name, 'es'));

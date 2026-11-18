@@ -19,6 +19,7 @@ export interface VacationRequest {
   ownerId?: string;
   email?: string;
   deductedDays?: number; // days taken from the balance when it was approved (returned if cancelled)
+  decidedBy?: string; // uid of the admin (jefatura) who approved or rejected it: decision.por
   halfDayFrom?: string; // HH:mm: a half day off (4 hours from this time, one working day). Deducts 0.5
   reason?: string; // why it was rejected (the worker sees it)
   comment?: string;

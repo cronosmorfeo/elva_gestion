@@ -38,6 +38,7 @@ export function toVacationRequest(id: string, data: DocumentData): VacationReque
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
     deductedDays: deductedDays(data['decision']),
+    decidedBy: decidedBy(data['decision']),
     halfDayFrom: HALF_DAY_STARTS.includes(text(data['medioDiaDesde'])) ? text(data['medioDiaDesde']) : undefined,
     reason: reason(data['decision']),
     comment: text(data['comentarioRRHH']) || undefined,
@@ -110,6 +111,12 @@ function status(value: unknown): RequestStatus {
 function reason(decision: unknown): string | undefined {
   const value: unknown =
     typeof decision === 'object' && decision !== null ? (decision as Record<string, unknown>)['motivo'] : undefined;
+  return text(value) || undefined;
+}
+
+function decidedBy(decision: unknown): string | undefined {
+  const value: unknown =
+    typeof decision === 'object' && decision !== null ? (decision as Record<string, unknown>)['por'] : undefined;
   return text(value) || undefined;
 }
 

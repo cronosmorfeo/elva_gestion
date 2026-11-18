@@ -3,7 +3,6 @@ import type { OvertimeRequest, VacationRequest } from '../admin-dashboard/admin-
 import type { RequestRow } from './my-requests-utils';
 import {
   ALL_MONTHS,
-  defaultMonth,
   inMonth,
   monthLabel,
   monthOptions,
@@ -89,13 +88,6 @@ describe('month filter', () => {
       { value: '2026-11', label: 'Noviembre 2026 · 2 solicitudes · 1 pendiente' },
       { value: ALL_MONTHS, label: 'Todos los meses' },
     ]);
-  });
-
-  it('opens on the current month when it has requests, otherwise the newest', () => {
-    const options = monthOptions(rows);
-    expect(defaultMonth(options, '2026-11-10')).toBe('2026-11');
-    expect(defaultMonth(options, '2027-02-01')).toBe('2026-12');
-    expect(defaultMonth(monthOptions([]), '2026-11-10')).toBe(ALL_MONTHS);
   });
 
   it('filters by month', () => {

@@ -11,6 +11,7 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 - **Earning days (confirmed by HR):** 12 days a year for everyone, earned **one per full month** (`colaboradores.diasAnuales`, default 12; it can be changed per employee in Edit employee). Days are earned from the day the balance is entered in the app (`colaboradores.acumulaDesde`), so days earned before are not counted twice. Other yearly amounts are rounded down to half days.
 - **Balance today** = `colaboradores.vacaciones_disponibles` (entered balance minus what was used) + days earned since `acumulaDesde`. Admins set today's balance in Edit employee; the app stores the part that makes the total match. New employees get the days they already have when they are created. Workers without a balance cannot request vacations.
 - **Available to request** = balance − days of pending requests (never below 0).
+- **Who decides:** only the jefatura (role `admin`: Félix or Vanessa) approves or rejects vacations. RH (role `rh`) sees them in the dashboard but cannot decide. Until the jefatura decides, the request stays `pendiente`. The Jefatura column shows who decided (`decision.por`).
 - **Approving** deducts the days in a transaction and is blocked if the balance is not enough. The days deducted are saved in the request (`decision.diasDescontados`).
 - **Cancelling** an approved vacation that has not started returns those same days.
 
@@ -21,6 +22,15 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 - Sundays and mandatory holidays pay **double** up to an 8-hour shift, then **triple**. Whether Saturday is also a rest day is _pending HR_ (`REST_WEEKDAYS` in `overtime-request/overtime-hours.ts`).
 - Shift plus overtime cannot exceed **12 hours a day**: up to 4 overtime hours on a workday, up to 12 on a rest day.
 - A request can cover up to one year.
+
+## Employees
+
+- **Deactivating is final:** a deactivated account cannot sign in again and cannot be reactivated (Edit employee asks first). Its history stays. If the person is hired again, they get a new account with their data at that time; to reuse the same email, delete only the old user in Firebase Authentication (the Firestore data stays).
+- **Data retention:** the day of deactivation is saved (`colaboradores.desactivadoEl`) and the employee list shows it. All data stays (profile, payment data, requests and weekly reports); nothing is deleted. How long to keep it is still to be defined with accounting/legal (Costa Rica's data protection law, Ley 8968, asks not to keep personal data longer than needed).
+
+## Feature flags
+
+Parts of the app can be turned off without changing the code, with booleans in Firestore at `config/featureFlags` (edited in the Firebase console): `horasExtra`, `reportes`, `avisos` and `pagos`. A section that is off is hidden from the menus and the dashboard, its page sends back to Inicio, and its notifications are not shown. A missing flag, a missing document or a read error counts as off, so the MVP (Costa Rica) only shows vacations. Defaults and the list are in `src/app/services/feature-flags.ts`.
 
 ## Requests
 

@@ -2,6 +2,7 @@ import type { Routes } from '@angular/router';
 
 import { adminGuard } from '../auth/admin.guard';
 import { authGuard } from '../auth/auth.guard';
+import { featureGuard } from '../auth/feature.guard';
 
 import { TabsPage } from './tabs.page';
 
@@ -40,7 +41,7 @@ export const routes: Routes = [
       },
       {
         path: 'horas-extra',
-        canActivate: [authGuard],
+        canActivate: [authGuard, featureGuard('horasExtra')],
         loadComponent: () => import('../overtime-request/overtime-request.page').then((m) => m.OvertimeRequestPage),
       },
       {
@@ -50,12 +51,12 @@ export const routes: Routes = [
       },
       {
         path: 'avisos',
-        canActivate: [authGuard],
+        canActivate: [authGuard, featureGuard('avisos')],
         loadComponent: () => import('../notices/notices.page').then((m) => m.NoticesPage),
       },
       {
         path: 'reporte',
-        canActivate: [authGuard],
+        canActivate: [authGuard, featureGuard('reportes')],
         loadComponent: () => import('../reports/weekly-report.page').then((m) => m.WeeklyReportPage),
       },
       {

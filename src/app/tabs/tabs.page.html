@@ -2,14 +2,19 @@
 <ng-template #navLinks>
   <a routerLink="/tabs/inicio" routerLinkActive="active" ariaCurrentWhenActive="page">Inicio</a>
   <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
+  @if (flags().horasExtra) {
   <a routerLink="/tabs/horas-extra" routerLinkActive="active" ariaCurrentWhenActive="page">Horas extra</a>
+  } @if (flags().reportes) {
   <a routerLink="/tabs/reporte" routerLinkActive="active" ariaCurrentWhenActive="page">Mi reporte</a>
+  }
   <a routerLink="/tabs/solicitudes" routerLinkActive="active" ariaCurrentWhenActive="page">Mis solicitudes</a>
+  @if (flags().avisos) {
   <a routerLink="/tabs/avisos" routerLinkActive="active" ariaCurrentWhenActive="page">
     Avisos @if (unseenNotices() > 0) {
     <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
     }
   </a>
+  }
   <a routerLink="/tabs/perfil" routerLinkActive="active" ariaCurrentWhenActive="page">Mi perfil</a>
   @if (isAdmin()) {
   <a routerLink="/tabs/dashboard">Panel de administración</a>
@@ -44,7 +49,7 @@
         (click)="toggleMenu()"
       >
         <span aria-hidden="true">{{ menuOpen() ? '✕' : '☰' }}</span>
-        {{ menuOpen() ? 'Cerrar' : 'Menú' }} @if (!menuOpen() && unseenNotices() > 0) {
+        {{ menuOpen() ? 'Cerrar' : 'Menú' }} @if (flags().avisos && !menuOpen() && unseenNotices() > 0) {
         <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
         }
       </button>

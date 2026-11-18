@@ -4,6 +4,7 @@ import { IonContent, ToastController } from '@ionic/angular';
 import { formatShortDate, formatTime, localIsoDate } from '../admin-dashboard/admin-dates';
 import { maskIban } from '../admin-dashboard/admin-requests';
 import { MAX_BANK_NOTE, ibanText, maskCedula, updatedText } from '../services/bank-account';
+import { FeatureFlagsService } from '../services/feature-flags';
 import { RequestsStore } from '../services/requests-store';
 import { dayCount, dayNumber } from '../shared/day-count';
 
@@ -18,6 +19,7 @@ import { longDay, seniority } from './profile-utils';
 export class ProfilePage {
   private readonly store = inject(RequestsStore);
   private readonly toast = inject(ToastController);
+  readonly flags = inject(FeatureFlagsService).flags;
 
   readonly profile = this.store.myProfile;
   readonly balance = this.store.myBalance;

@@ -49,6 +49,7 @@
       "admin": "Administrador"
     },
     "rolesDelPanel": ["admin", "rh"],
+    "decidenVacaciones": "Solo admin (jefatura: Félix o Vanessa). rh ve las solicitudes pero no decide; sin decisión de admin la solicitud sigue pendiente.",
     "transacciones": "Aprobar vacaciones, rechazar y cancelar usan transacciones de Firestore: si dos personas actúan a la vez, el saldo cambia una sola vez y no se pisa una decisión.",
     "nombresDeColecciones": "Las colecciones de solicitudes, avisos y reportes están en inglés (como vacations_requests, que creó Andrey); los campos, en español."
   },
@@ -110,7 +111,12 @@
         "activo": {
           "tipo": "boolean",
           "requerido": true,
-          "descripcion": "false = no puede iniciar sesión"
+          "descripcion": "false = no puede iniciar sesión. Desactivar es definitivo: la cuenta no se reactiva; si la persona vuelve, se le crea una cuenta nueva."
+        },
+        "desactivadoEl": {
+          "tipo": "fechaDia",
+          "requerido": false,
+          "descripcion": "Día en que se desactivó la cuenta. Los datos no se borran; el plazo para guardarlos está por definir."
         },
         "vacaciones_disponibles": {
           "tipo": "number (enteros o medios días)",
@@ -529,12 +535,29 @@
           "descripcion": "Navegador (máx. 200 letras)"
         }
       }
+    },
+    "feature_flags": {
+      "ruta": "config/featureFlags",
+      "descripcion": "Prende o apaga partes de la página sin tocar el código. Un flag que falta, o el documento entero, cuenta como apagado: en el MVP solo se ven las vacaciones.",
+      "escribe": "Nadie desde la página; se edita en la consola de Firebase.",
+      "lee": "Cualquiera con sesión.",
+      "campos": {
+        "horasExtra": { "tipo": "boolean", "requerido": false, "descripcion": "Horas extra (trabajador y panel)" },
+        "reportes": { "tipo": "boolean", "requerido": false, "descripcion": "Reportes semanales" },
+        "avisos": { "tipo": "boolean", "requerido": false, "descripcion": "Avisos" },
+        "pagos": {
+          "tipo": "boolean",
+          "requerido": false,
+          "descripcion": "Pagos pendientes, datos de pago (Mi perfil y Editar empleado) y cambios de cuenta"
+        }
+      },
+      "ejemplo": { "horasExtra": false, "reportes": false, "avisos": false, "pagos": false }
     }
   },
   "todaviaNoEnFirestore": {
     "pagos": "Pagos pendientes del panel: datos de ejemplo (admin-sample-data.ts). Se conectan cuando RH pase el Excel de planilla.",
     "actividad": "Actividad reciente del panel: solo en memoria, se borra al recargar. Propuesta: colección actividad (solo crear).",
-    "revisionRh": "La revisión de RH no existe todavía; toda solicitud cuenta como revisada.",
+    "revisionRh": "No hay paso de revisión de RH: las vacaciones las decide la jefatura (admin). rhReviewed siempre es true; en horas extra queda sin uso.",
     "archivosDeReportes": "Firebase Storage (pide plan Blaze)."
   },
   "calculadosSinGuardar": {
@@ -643,7 +666,8 @@
     "colaboradores": "lee el dueño o admin; escribe admin; nadie cambia su propio tipo_colaborador, activo ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
     "privado/pago": "lee el dueño o admin; escribe admin, nunca sobre su propia cuenta",
     "bank_change_requests": "crea el dueño con estado pendiente; lee el dueño o admin; actualiza admin",
-    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin decide",
+    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin decide (en vacaciones, solo tipo_colaborador == 'admin', no rh)",
+    "config/featureFlags": "lee cualquiera con sesión; nadie escribe desde la página",
     "devolucionDeDias": "Hoy el navegador del trabajador devuelve los días al cancelar. La regla solo debe permitir sumar decision.diasDescontados de esa solicitud, o hacerlo en una Cloud Function.",
     "weekly_reports": "crea el dueño con visto == null; lee dueño o admin; admin cambia visto",
     "notices": "lee cualquiera con sesión; escribe admin",

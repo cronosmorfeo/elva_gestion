@@ -77,6 +77,7 @@ Open `http://localhost:4200`. Both environment files are in `.gitignore` and are
 3. In **Project settings > Cloud Messaging > Web Push certificates**, generate a key and copy it into `firebaseVapidKey`.
 4. In **Authentication > Sign-in method**, enable **Email/Password**.
 5. Create a **Firestore Database**.
+6. Optional: create the document `config/featureFlags` with booleans `horasExtra`, `reportes`, `avisos` and `pagos` to turn those sections on. Without it, only vacations show (see [Business rules](docs/business-rules.md#feature-flags)).
 
 Push notifications with the page closed and file uploads need the **Blaze** plan; see [`functions/README.md`](functions/README.md).
 

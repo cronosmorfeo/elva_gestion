@@ -19,19 +19,21 @@
         <span class="home-go">Ver solicitudes →</span>
       </a>
 
+      @if (flags().avisos) {
       <a class="card home-tile" routerLink="/tabs/avisos">
         <span class="home-label">Avisos</span>
         <strong class="home-value">{{ unseenNotices() }}</strong>
         <span class="home-sub">{{ latestNotice() }}</span>
         <span class="home-go">Ver avisos →</span>
       </a>
-
+      } @if (flags().reportes) {
       <a class="card home-tile" routerLink="/tabs/reporte">
         <span class="home-label">Reporte semanal</span>
         <strong class="home-value">{{ reportSent() ? 'Enviado' : 'Sin enviar' }}</strong>
         <span class="home-sub">{{ weekText() }} · opcional</span>
         <span class="home-go">{{ reportSent() ? 'Ver reporte →' : 'Escribir reporte →' }}</span>
       </a>
+      }
     </div>
 
     <h2>Próximamente</h2>

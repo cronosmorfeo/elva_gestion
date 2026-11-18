@@ -37,6 +37,7 @@ import {
 } from './bank-account';
 import type { Worker } from './current-worker';
 import { currentWorker } from './current-worker';
+import { FeatureFlagsService } from './feature-flags';
 import {
   COLLECTIONS,
   sortBySent,
@@ -65,6 +66,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class RequestsStore {
   private readonly notifications = inject(NotificationsService);
+  private readonly featureFlags = inject(FeatureFlagsService);
 
   readonly vacations = signal<VacationRequest[]>([]);
   readonly overtime = signal<OvertimeRequest[]>([]);
@@ -128,7 +130,7 @@ export class RequestsStore {
     this.listen(scoped(COLLECTIONS.overtime), (s) => {
       const list = sortBySent(mapDocs(s, toOvertimeRequest));
       this.overtime.set(list);
-      this.notify(overtimeEvents(overtimeSeen, list, admin));
+      if (this.featureFlags.flags().horasExtra) this.notify(overtimeEvents(overtimeSeen, list, admin));
       overtimeSeen = lastSeen(list);
     });
     this.listen(scoped(COLLECTIONS.reports), (s) => this.reports.set(sortBySent(mapDocs(s, toWorkReport))));
@@ -147,7 +149,7 @@ export class RequestsStore {
       (snap) => {
         const account = toBankAccount(snap.data());
         const changed = bankChangedEvent(bankBefore, account);
-        if (changed) void this.notifications.show(changed);
+        if (changed && this.featureFlags.flags().pagos) void this.notifications.show(changed);
         bankBefore = account?.iban ?? null;
         this.myBank.set(account);
         this.myBankLoaded.set(true);
@@ -164,14 +166,14 @@ export class RequestsStore {
       this.myBankRequest.set(list.find((r) => r.uid === uid) ?? null);
       if (admin) {
         this.bankRequests.set(list.filter((r) => r.status === 'pendiente'));
-        this.notify(bankRequestEvents(bankRequestsSeen, list));
+        if (this.featureFlags.flags().pagos) this.notify(bankRequestEvents(bankRequestsSeen, list));
         bankRequestsSeen = lastSeen(list.map((r) => ({ id: r.id })));
       }
     });
     this.listen(collection(db, COLLECTIONS.notices), (s) => {
       const list = mapDocs(s, toNotice);
       this.notices.set(list);
-      this.notify(noticeEvents(noticesSeen, list, admin));
+      if (this.featureFlags.flags().avisos) this.notify(noticeEvents(noticesSeen, list, admin));
       noticesSeen = lastSeen(list);
     });
   }

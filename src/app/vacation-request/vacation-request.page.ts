@@ -156,7 +156,17 @@ export class VacationRequestPage implements OnInit {
   async submit(): Promise<void> {
     if (!this.canSubmit() || this.sending()) return;
     this.sending.set(true);
-    const worker = (await this.store.currentWorker()) ?? { uid: 'local', name: 'Vos' };
+    const worker = await this.store.currentWorker();
+    if (!worker) {
+      this.sending.set(false);
+      const expired = await this.toast.create({
+        message: 'Su sesión se cerró. Inicie sesión de nuevo.',
+        duration: 5000,
+        position: 'bottom',
+      });
+      await expired.present();
+      return;
+    }
     const days = this.deductedText();
     
     console.log('[VacationRequest] Enviando solicitud de vacaciones con balance:', this.availableDays());

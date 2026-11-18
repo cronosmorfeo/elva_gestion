@@ -18,13 +18,16 @@ What each role may do, and what still has to be enforced. The app's guards only 
 | `weekly_reports`                          | The owner, admin/HR (never coworkers) | The owner creates; admin/HR set `visto`                                                     |
 | `notices`                                 | Anyone signed in                      | Admin/HR                                                                                    |
 | `users/{uid}/fcmTokens`                   | Cloud Functions                       | Each user, only their own tokens                                                            |
+| `config/featureFlags`                     | Anyone signed in                      | Nobody from the app (Firebase console only)                                                 |
 
-Admin/HR means `colaboradores/{uid}.tipo_colaborador` is `admin` or `rh` and `activo` is `true`.
+Admin/HR means `colaboradores/{uid}.tipo_colaborador` is `admin` or `rh` and `activo` is `true`. Approving or rejecting a vacation is for `admin` only (the jefatura); HR sees them but cannot decide.
 
 ## Known gaps
 
 - **Vacation balance:** when a worker cancels, their browser returns the days to their own balance. The rules (or a Cloud Function) must only allow returning the `decision.diasDescontados` of that request.
 - **Monthly accrual uses the device clock:** today's balance (`acumulaDesde` + full months) is computed with the browser's date, so moving the clock forward shows more days. Approval uses the admin's clock, so the risk is low today, but the rules should check the balance with `request.time` when a vacation is approved.
 - **Own payment account and role:** the page blocks them in Edit employee, but only the rules can really enforce it.
+- **Feature flags only hide:** a section that is off is hidden and its page redirects, but its data can still be read or written directly in Firestore. If a feature must be really off, the rules have to block it too.
+- **Deactivated accounts:** the page blocks reactivation and signs the person out, but their Firebase Authentication user still exists. The rules must require `activo == true`, and nobody may set `activo` back to `true`.
 - **Push test page** (`/tabs/tab2`) signs in anonymously; remove it and disable anonymous sign-in in Firebase.
 - **Notifications** must not include sensitive data, because they show on the lock screen.

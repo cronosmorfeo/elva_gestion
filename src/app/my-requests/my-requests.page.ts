@@ -2,16 +2,16 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IonContent, ToastController } from '@ionic/angular';
 
-import { localIsoDate } from '../admin-dashboard/admin-dates';
 import { localDateTime } from '../notices/notice-utils';
 import type { Worker } from '../services/current-worker';
+import { FeatureFlagsService } from '../services/feature-flags';
 import { RequestsStore } from '../services/requests-store';
 import type { CancelResult } from '../services/vacation-balance';
 import { canCancel } from '../services/vacation-balance';
 import { dayCount } from '../shared/day-count';
 
 import type { RequestKind } from './my-requests-utils';
-import { defaultMonth, inMonth, monthOptions, overtimeRows, vacationRows } from './my-requests-utils';
+import { ALL_MONTHS, inMonth, monthOptions, overtimeRows, vacationRows } from './my-requests-utils';
 
 // A worker's own vacation and overtime requests, with the admin's decision.
 // Only the owner's requests are listed here (the Firestore rules must enforce the same).
@@ -27,7 +27,10 @@ export class MyRequestsPage {
 
   readonly worker = signal<Worker | null>(null);
   readonly loading = signal(true);
-  readonly kind = signal<RequestKind>('vacaciones');
+  readonly flags = inject(FeatureFlagsService).flags;
+  private readonly pickedKind = signal<RequestKind>('vacaciones');
+  // Only vacations while overtime is turned off.
+  readonly kind = computed<RequestKind>(() => (this.flags().horasExtra ? this.pickedKind() : 'vacaciones'));
 
   readonly vacations = computed(() => {
     const w = this.worker();
@@ -39,10 +42,11 @@ export class MyRequestsPage {
   });
   private readonly kindRows = computed(() => (this.kind() === 'vacaciones' ? this.vacations() : this.overtime()));
 
-  // Month filter, so a long history does not mean scrolling forever. '' = the default month.
+  // Month filter to find an old request. It opens on all months, newest first, so a request
+  // that was just decided is never hidden in another month. '' = all months.
   readonly months = computed(() => monthOptions(this.kindRows()));
   private readonly pickedMonth = signal('');
-  readonly month = computed(() => this.pickedMonth() || defaultMonth(this.months(), localIsoDate(new Date())));
+  readonly month = computed(() => this.pickedMonth() || ALL_MONTHS);
   private readonly now = signal(localDateTime(new Date()));
   readonly rows = computed(() =>
     inMonth(this.kindRows(), this.month()).map((r) => ({
@@ -57,7 +61,7 @@ export class MyRequestsPage {
   }
 
   setKind(kind: RequestKind): void {
-    this.kind.set(kind);
+    this.pickedKind.set(kind);
     this.pickedMonth.set('');
     this.confirmCancelId.set(null);
   }

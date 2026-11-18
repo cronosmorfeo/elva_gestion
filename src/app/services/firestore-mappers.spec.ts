@@ -33,6 +33,11 @@ describe('toVacationRequest', () => {
     });
   });
 
+  it('reads who decided it', () => {
+    expect(toVacationRequest('abc', { ...vacation, decision: { por: 'uidFelix' } })?.decidedBy).toBe('uidFelix');
+    expect(toVacationRequest('abc', vacation)?.decidedBy).toBeUndefined();
+  });
+
   it('reads a half day and ignores unknown values', () => {
     expect(toVacationRequest('abc', { ...vacation, medioDiaDesde: '07:30' })?.halfDayFrom).toBe('07:30');
     expect(toVacationRequest('abc', { ...vacation, medioDiaDesde: '22:00' })?.halfDayFrom).toBeUndefined();

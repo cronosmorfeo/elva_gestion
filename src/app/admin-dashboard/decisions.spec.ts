@@ -1,5 +1,5 @@
 import type { VacationRequest } from './admin-requests';
-import { MAX_REASON, reasonProblem, vacationConflicts } from './decisions';
+import { MAX_REASON, isJefatura, jefaturaText, reasonProblem, vacationConflicts } from './decisions';
 
 const vac = (
   id: string,
@@ -9,6 +9,25 @@ const vac = (
   returnDate: string,
   status: VacationRequest['status'] = 'aprobada',
 ): VacationRequest => ({ id, ownerId, employee, balance: 10, start, returnDate, rhReviewed: true, status });
+
+describe('jefatura', () => {
+  it('only the admin role decides vacations', () => {
+    expect(isJefatura('admin')).toBe(true);
+    expect(isJefatura(' Admin ')).toBe(true);
+    expect(isJefatura('rh')).toBe(false);
+    expect(isJefatura('regular')).toBe(false);
+    expect(isJefatura(undefined)).toBe(false);
+  });
+
+  it('says who approved or rejected', () => {
+    expect(jefaturaText('pendiente', '')).toBe('Pendiente');
+    expect(jefaturaText('aprobada', 'Félix Rojas')).toBe('Aprobó Félix');
+    expect(jefaturaText('rechazada', 'Vanessa Mora')).toBe('Rechazó Vanessa');
+    expect(jefaturaText('aprobada', '')).toBe('Aprobada');
+    expect(jefaturaText('cancelada', 'Félix Rojas')).toBe('Aprobó Félix');
+    expect(jefaturaText('cancelada', '')).toBe('—');
+  });
+});
 
 describe('rejection reason', () => {
   it('is required and short', () => {

@@ -10,7 +10,7 @@
       </div>
 
       <nav class="menu" aria-label="Menú de administración">
-        @for (section of sections; track section.id) {
+        @for (section of sections(); track section.id) {
         <button
           type="button"
           class="menu-item"
@@ -27,13 +27,14 @@
           <span class="badge">{{ paymentSummary().pendingCount }}</span>
           }
         </button>
-        }
+        } @if (flags().reportes) {
         <button type="button" class="menu-item" (click)="goTo('empleados')">
           <span>Reportes</span>
           @if (unseenReports() > 0) {
           <span class="badge" [attr.aria-label]="unseenReports() + ' reportes sin ver'">{{ unseenReports() }}</span>
           }
         </button>
+        }
       </nav>
 
       <div class="profile">
@@ -64,13 +65,14 @@
         <div class="kpi">
           <span class="label">Vacaciones pendientes</span>
           <span class="value warn">{{ summary().pendingVacations }}</span>
-          <span class="sub">{{ summary().waitingRh }}</span>
+          <span class="sub">{{ summary().waitingJefatura }}</span>
         </div>
         <div class="kpi">
           <span class="label">Vacaciones aprobadas</span>
           <span class="value">{{ summary().approvedVacations }}</span>
           <span class="sub">{{ summary().approvedVacationDays }} en total</span>
         </div>
+        @if (flags().horasExtra) {
         <div class="kpi">
           <span class="label">Horas extra pendientes</span>
           <span class="value warn">{{ summary().pendingOvertime }}</span>
@@ -81,6 +83,7 @@
           <span class="value">{{ summary().approvedOvertime }}</span>
           <span class="sub">{{ summary().approvedOvertimeHours }} en total</span>
         </div>
+        }
       </section>
 
       <div class="columns">
@@ -127,7 +130,7 @@
                     <th>Empleado</th>
                     <th>Fechas</th>
                     <th>Días</th>
-                    <th>Revisión RH</th>
+                    <th>Jefatura</th>
                     <th class="right">Decisión</th>
                   </tr>
                 </thead>
@@ -144,11 +147,15 @@
                     <td>{{ row.start }} <span class="muted inline">→ vuelve</span> {{ row.returnDate }}</td>
                     <td class="num">{{ row.days }}</td>
                     <td>
-                      @if (row.rhReviewed) {
-                      <span class="chip ok">Revisada</span>
-                      } @else {
-                      <span class="chip warn">Falta RH</span>
-                      }
+                      <span
+                        class="chip"
+                        [class.warn]="row.status === 'pendiente'"
+                        [class.ok]="row.status === 'aprobada'"
+                        [class.rejected]="row.status === 'rechazada'"
+                        [class.off]="row.status === 'cancelada'"
+                      >
+                        {{ row.jefatura }}
+                      </span>
                     </td>
                     <td class="right">
                       @if (row.canDecide) {
@@ -161,7 +168,7 @@
                         </button>
                       </div>
                       } @else if (row.waiting) {
-                      <span class="muted inline">Espera a RH</span>
+                      <span class="muted inline">La decide la jefatura</span>
                       } @else if (row.status === 'aprobada') {
                       <span class="chip ok">Aprobada</span>
                       } @else if (row.status === 'cancelada') {
@@ -183,6 +190,7 @@
             </div>
           </section>
 
+          @if (flags().horasExtra) {
           <section id="horas-extra" class="card" aria-labelledby="t-he">
             <div class="card-head">
               <h2 id="t-he">Horas extra por aprobar</h2>
@@ -274,8 +282,7 @@
               </table>
             </div>
           </section>
-
-          @if (bankRequests().length) {
+          } @if (flags().pagos && bankRequests().length) {
           <section class="card bank-requests" aria-labelledby="t-bank">
             <div class="card-head">
               <h2 id="t-bank">Cambios de cuenta solicitados</h2>
@@ -335,7 +342,9 @@
                     <th>Jornada</th>
                     <th>Ingreso</th>
                     <th>Estado</th>
+                    @if (flags().reportes) {
                     <th>Reportes</th>
+                    }
                     <th class="right">Acciones</th>
                   </tr>
                 </thead>
@@ -354,8 +363,11 @@
                       <span class="chip ok">Activo</span>
                       } @else {
                       <span class="chip off">Inactivo</span>
-                      }
+                      @if (e.inactiveSince) {
+                      <span class="muted">{{ e.inactiveSince }}</span>
+                      } }
                     </td>
+                    @if (flags().reportes) {
                     <td>
                       <button
                         type="button"
@@ -367,6 +379,7 @@
                         {{ unseenFor(e.id) > 0 ? unseenFor(e.id) + ' sin ver' : 'Ver' }}
                       </button>
                     </td>
+                    }
                     <td class="right">
                       <button type="button" class="btn ghost" [id]="'edit-' + e.id" (click)="openEdit(e.id)">
                         Editar
@@ -375,7 +388,7 @@
                   </tr>
                   } @empty {
                   <tr>
-                    <td colspan="7" class="empty">
+                    <td [attr.colspan]="flags().reportes ? 7 : 6" class="empty">
                       {{ search() ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay empleados. Creá el primero.' }}
                     </td>
                   </tr>
@@ -389,6 +402,7 @@
         </div>
 
         <div class="col-side">
+          @if (flags().pagos) {
           <section id="pagos" class="card dark" aria-labelledby="t-pagos">
             <div class="pay-head">
               <h2 id="t-pagos">Pagos pendientes</h2>
@@ -427,7 +441,7 @@
             </div>
             }
           </section>
-
+          } @if (flags().avisos) {
           <section id="avisos" class="card" aria-labelledby="t-avisos">
             <div class="card-head">
               <h2 id="t-avisos" class="small-title">Avisos para el equipo</h2>
@@ -461,6 +475,7 @@
             <p class="empty left">No hay avisos publicados.</p>
             }
           </section>
+          }
 
           <section class="card" aria-labelledby="t-semana">
             <h2 id="t-semana" class="small-title">De vacaciones esta semana</h2>
@@ -921,17 +936,30 @@
               id="edit-activo"
               type="checkbox"
               [checked]="f.activo"
-              [disabled]="f.self"
+              [disabled]="f.self || f.locked || confirmDeactivate()"
               (change)="setEditActive($event)"
             />
             <span>{{ f.activo ? 'Activo: puede iniciar sesión' : 'Inactivo: no puede iniciar sesión' }}</span>
           </label>
           @if (f.self) {
           <span class="muted">No podés desactivar tu propia cuenta.</span>
+          } @else if (f.locked) {
+          <span class="muted">Cuenta desactivada. Si vuelve a trabajar en ELVA, creale una cuenta nueva.</span>
+          } @else if (confirmDeactivate()) {
+          <span class="muted">
+            ¿Desactivar para siempre? Ya no podrá entrar y la cuenta no se puede reactivar. Su historial se guarda.
+          </span>
+          <span>
+            <button type="button" class="btn ghost small" (click)="answerDeactivate(false)">No</button>
+            <button type="button" class="btn danger small" (click)="answerDeactivate(true)">Sí, desactivar</button>
+          </span>
+          } @else if (!f.activo) {
+          <span class="muted">Al guardar, la cuenta queda desactivada para siempre.</span>
           }
         </div>
       </div>
 
+      @if (flags().pagos) {
       <h3 class="edit-section">Datos de pago</h3>
       @if (f.self) {
       <p class="muted">Tu cuenta la cambia otro administrador.</p>
@@ -990,8 +1018,7 @@
           } }
         </div>
       </div>
-
-      @if (editState()?.bankError && editState()?.changed) {
+      } @if (flags().pagos && editState()?.bankError && editState()?.changed) {
       <p class="error-text">{{ editState()?.bankError }}</p>
       } @if (editState()?.missing) {
       <p class="error-text">{{ editState()?.missing }}</p>

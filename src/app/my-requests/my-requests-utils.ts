@@ -68,12 +68,6 @@ export function monthOptions(rows: RequestRow[]): MonthOption[] {
   return [...months, { value: ALL_MONTHS, label: 'Todos los meses' }];
 }
 
-// The current month if it has requests; otherwise the newest month that has any.
-export function defaultMonth(options: MonthOption[], today: string): string {
-  const current = today.slice(0, 7);
-  return options.find((o) => o.value === current)?.value ?? options[0]?.value ?? ALL_MONTHS;
-}
-
 export function inMonth(rows: RequestRow[], month: string): RequestRow[] {
   return month === ALL_MONTHS ? rows : rows.filter((r) => r.month === month);
 }

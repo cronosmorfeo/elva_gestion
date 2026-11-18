@@ -9,6 +9,7 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { isAdminRole } from '../auth/admin.guard';
 import { isSignedIn } from '../auth/auth.guard';
 import { NotificationCardsComponent } from '../notification-cards/notification-cards.component';
+import { FeatureFlagsService } from '../services/feature-flags';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 
@@ -28,7 +29,10 @@ export class TabsPage {
   private readonly notifications = inject(NotificationsService);
   private readonly toast = inject(ToastController);
 
+  private readonly featureFlags = inject(FeatureFlagsService);
+
   readonly notifyState = this.notifications.state;
+  readonly flags = this.featureFlags.flags;
   readonly unseenNotices = this.store.unseenNotices;
   readonly signedIn = signal(false);
   readonly isAdmin = signal(false);
@@ -57,8 +61,10 @@ export class TabsPage {
     const stop = onAuthStateChanged(getAuth(), (user) => {
       this.signedIn.set(isSignedIn(user));
       this.isAdmin.set(false);
-      if (user && isSignedIn(user)) void this.loadRole(user.uid);
-      else this.store.forgetWorker();
+      if (user && isSignedIn(user)) {
+        void this.featureFlags.load();
+        void this.loadRole(user.uid);
+      } else this.store.forgetWorker();
     });
     destroyRef.onDestroy(stop);
   }

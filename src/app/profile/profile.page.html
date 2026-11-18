@@ -55,6 +55,7 @@
       </dl>
     </section>
 
+    @if (flags().pagos) {
     <section class="card profile-card" aria-labelledby="p-bank">
       <h2 id="p-bank">Datos de pago</h2>
       @if (!bankLoaded()) {
@@ -103,7 +104,7 @@
       <button type="button" class="profile-change" (click)="askChange()">Solicitar cambio de cuenta</button>
       } }
     </section>
-    } @else {
+    } } @else {
     <p class="note">Cargando…</p>
     }
   </div>

@@ -20,7 +20,7 @@ What each role may do, and what still has to be enforced. The app's guards only 
 | `users/{uid}/fcmTokens`                   | Cloud Functions                       | Each user, only their own tokens                                                            |
 | `config/featureFlags`                     | Anyone signed in                      | Nobody from the app (Firebase console only)                                                 |
 
-Admin/HR means `colaboradores/{uid}.tipo_colaborador` is `admin` or `rh` and `activo` is `true`. Vacations: HR writes only `aprobacionRh` (a check, the request stays pending) and `admin` (the jefatura) only `aprobacionJefatura`; `estado` becomes `aprobada` only together with `aprobacionJefatura`. Either can reject.
+Admin/HR means `colaboradores/{uid}.tipo_colaborador` is `admin` or `rh` and `activo` is `true`. Vacations and overtime: HR writes only `aprobacionRh` (a check, the request stays pending) and `admin` (the jefatura) only `aprobacionJefatura`; `estado` becomes `aprobada` only together with `aprobacionJefatura`. Either can reject.
 
 ## Known gaps
 

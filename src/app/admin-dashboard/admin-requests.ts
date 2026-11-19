@@ -7,7 +7,15 @@ import { addDays, formatShortDate, formatTime } from './admin-dates';
 // 'cancelada': the worker cancelled it while it was pending. It is kept for the history.
 export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada';
 
-export interface VacationRequest {
+// Who approved or decided a request. Vacations and overtime follow the same flow (see decisions.ts).
+export interface Approvals {
+  decidedBy?: string; // uid of who made the final decision: decision.por
+  decidedAs?: 'rh' | 'jefatura'; // which side rejected it: decision.rol
+  rhApprovedBy?: string; // uid: aprobacionRh.por
+  bossApprovedBy?: string; // uid of Félix or Vanessa: aprobacionJefatura.por
+}
+
+export interface VacationRequest extends Approvals {
   id: string;
   employee: string;
   balance: number;
@@ -19,17 +27,13 @@ export interface VacationRequest {
   ownerId?: string;
   email?: string;
   deductedDays?: number; // days taken from the balance when it was approved (returned if cancelled)
-  decidedBy?: string; // uid of who made the final decision: decision.por
-  decidedAs?: 'rh' | 'jefatura'; // which side rejected it: decision.rol
-  rhApprovedBy?: string; // uid: aprobacionRh.por
-  bossApprovedBy?: string; // uid of Félix or Vanessa: aprobacionJefatura.por
   halfDayFrom?: string; // HH:mm: a half day off (4 hours from this time, one working day). Deducts 0.5
   reason?: string; // why it was rejected (the worker sees it)
   comment?: string;
   sentAt?: string; // YYYY-MM-DDTHH:mm
 }
 
-export interface OvertimeRequest {
+export interface OvertimeRequest extends Approvals {
   id: string;
   employee: string;
   start: string; // YYYY-MM-DDTHH:mm

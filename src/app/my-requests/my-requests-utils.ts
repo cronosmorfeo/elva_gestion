@@ -1,5 +1,5 @@
 import { addDays, formatShortDate, formatTime } from '../admin-dashboard/admin-dates';
-import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
+import type { Approvals, OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
 import {
   formatHours,
   halfDayText,
@@ -87,8 +87,8 @@ export function statusText(status: RequestStatus, rhReviewed: boolean): string {
   return rhReviewed ? 'Pendiente' : 'Pendiente · en revisión de RH';
 }
 
-// A pending vacation waits for the jefatura; the worker sees when RH already approved it.
-export function vacationPendingText(r: VacationRequest): string {
+// A pending request (vacations or overtime) waits for the jefatura; the worker sees when RH already approved it.
+export function pendingText(r: Approvals): string {
   return r.rhApprovedBy ? 'Pendiente · falta la jefatura' : 'Pendiente';
 }
 
@@ -113,7 +113,7 @@ export function vacationRows(list: VacationRequest[], ownerId: string): RequestR
         note: r.comment ?? '',
         sent: sentText(r.sentAt),
         status: r.status,
-        statusText: r.status === 'pendiente' ? vacationPendingText(r) : statusText(r.status, r.rhReviewed),
+        statusText: r.status === 'pendiente' ? pendingText(r) : statusText(r.status, r.rhReviewed),
         month: r.start.slice(0, 7),
         start: r.start,
         returnDays: r.status === 'aprobada' ? (r.deductedDays ?? 0) : 0,
@@ -136,7 +136,7 @@ export function overtimeRows(list: OvertimeRequest[], ownerId: string): RequestR
       note: r.task,
       sent: sentText(r.sentAt),
       status: r.status,
-      statusText: statusText(r.status, r.rhReviewed),
+      statusText: r.status === 'pendiente' ? pendingText(r) : statusText(r.status, r.rhReviewed),
       month: r.start.slice(0, 7),
       start: r.start,
       returnDays: 0,

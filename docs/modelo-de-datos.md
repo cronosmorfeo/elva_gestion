@@ -37,7 +37,8 @@ El modelo completo está en **`modelo-de-datos.json`**, en esta misma carpeta. E
 - Las solicitudes guardan el `uid` de quien las pidió y también el nombre y el correo para mostrarlos rápido.
 - `estado` puede ser `pendiente`, `aprobada`, `rechazada` o `cancelada`. Si falta, cuenta como pendiente.
 - No se guarda lo que se puede calcular (feriados, horas, pago 1.5x/doble/triple, choques, antigüedad), salvo los días descontados, que quedan en la solicitud para poder devolverlos al cancelar.
-- Aprobar vacaciones, rechazar y cancelar usan transacciones: si dos personas actúan a la vez, el saldo cambia una sola vez.
+- Vacaciones y horas extra se aprueban igual: RH puede aprobar primero (`aprobacionRh`, sigue pendiente) y la jefatura da la aprobación final (`aprobacionJefatura`). Cualquiera rechaza.
+- Aprobar, rechazar y cancelar usan transacciones: si dos personas actúan a la vez, el saldo cambia una sola vez.
 
 ## Pendiente
 

@@ -215,11 +215,11 @@ export class RequestsStore {
 
   // Rejects with a reason the worker will read. In a transaction, so a request the worker just
   // cancelled, or another admin just decided, is not overwritten.
-  // `as` says which side rejects a vacation (RH or the jefatura); either one is enough.
-  rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string, as?: Approver): Promise<void> {
+  // `as` says which side rejects it (RH or the jefatura); either one is enough.
+  rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string, as: Approver): Promise<void> {
     return this.decidePending(kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id, {
       estado: 'rechazada',
-      decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim(), ...(as ? { rol: as } : {}) },
+      decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim(), rol: as },
     });
   }
 
@@ -336,10 +336,28 @@ export class RequestsStore {
     });
   }
 
-  approveOvertime(id: string): Promise<void> {
-    return this.decidePending(COLLECTIONS.overtime, id, {
-      estado: 'aprobada',
-      decision: { por: this.uid, fecha: serverTimestamp() },
+  // Same flow as vacations, without a balance: RH's approval is saved and the request stays pending;
+  // the jefatura's approval is final, with or without RH's. One transaction, so two people approving
+  // at once cannot overwrite each other or a cancellation.
+  async approveOvertime(id: string, as: Approver): Promise<'parcial' | 'aprobada'> {
+    const db = getFirestore();
+    const ref = doc(db, COLLECTIONS.overtime, id);
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new ApproveError('no-existe');
+      const data = snap.data();
+      const estado: unknown = data['estado'];
+      if (estado === 'cancelada') throw new ApproveError('cancelada');
+      if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
+      const field = APPROVAL_FIELDS[as];
+      if (data[field]) throw new ApproveError('ya-aprobo');
+      const approval = { por: this.uid, fecha: serverTimestamp() };
+      if (as === 'rh') {
+        tx.update(ref, { [field]: approval });
+        return 'parcial';
+      }
+      tx.update(ref, { [field]: approval, estado: 'aprobada', decision: { por: this.uid, fecha: serverTimestamp() } });
+      return 'aprobada';
     });
   }
 

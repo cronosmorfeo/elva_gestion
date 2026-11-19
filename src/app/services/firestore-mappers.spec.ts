@@ -112,6 +112,18 @@ describe('toOvertimeRequest', () => {
     });
   });
 
+  it('reads who approved and who rejected it, like vacations', () => {
+    const r = toOvertimeRequest('o1', {
+      ...overtime,
+      aprobacionRh: { por: 'uidKatia' },
+      decision: { por: 'uidVanessa', rol: 'jefatura', motivo: 'No hace falta' },
+    });
+    expect(r?.rhApprovedBy).toBe('uidKatia');
+    expect(r?.bossApprovedBy).toBeUndefined();
+    expect(r?.decidedBy).toBe('uidVanessa');
+    expect(r?.decidedAs).toBe('jefatura');
+  });
+
   it('skips documents with wrong times', () => {
     expect(toOvertimeRequest('a', { ...overtime, inicio: '2026-11-14' })).toBeNull();
     expect(toOvertimeRequest('b', { ...overtime, fin: '2026-11-14T07:00' })).toBeNull();

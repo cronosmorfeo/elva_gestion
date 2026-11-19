@@ -1,7 +1,7 @@
 import type { DocumentData } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 
-import type { OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
+import type { Approvals, OvertimeRequest, RequestStatus, VacationRequest } from '../admin-dashboard/admin-requests';
 import { HALF_DAY_STARTS } from '../admin-dashboard/admin-requests';
 import type { Notice } from '../notices/notice-utils';
 import { localDateTime } from '../notices/notice-utils';
@@ -21,7 +21,6 @@ const DAY_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 // Each function turns a Firestore document into the shape the pages use.
 // They return null when a required field is missing or wrong, so one bad document cannot break a page.
-// RH review is not built yet, so every request counts as reviewed by RH.
 
 export function toVacationRequest(id: string, data: DocumentData): VacationRequest | null {
   const start = text(data['diaInicio']);
@@ -38,10 +37,7 @@ export function toVacationRequest(id: string, data: DocumentData): VacationReque
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
     deductedDays: deductedDays(data['decision']),
-    decidedBy: by(data['decision']),
-    decidedAs: rol(data['decision']),
-    rhApprovedBy: by(data['aprobacionRh']),
-    bossApprovedBy: by(data['aprobacionJefatura']),
+    ...approvals(data),
     halfDayFrom: HALF_DAY_STARTS.includes(text(data['medioDiaDesde'])) ? text(data['medioDiaDesde']) : undefined,
     reason: reason(data['decision']),
     comment: text(data['comentarioRRHH']) || undefined,
@@ -63,8 +59,19 @@ export function toOvertimeRequest(id: string, data: DocumentData): OvertimeReque
     rhReviewed: true,
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
+    ...approvals(data),
     reason: reason(data['decision']),
     sentAt: dateTime(data['fechaSolicitud']),
+  };
+}
+
+// The RH and jefatura approvals and the final decision, the same for vacations and overtime.
+function approvals(data: DocumentData): Approvals {
+  return {
+    decidedBy: by(data['decision']),
+    decidedAs: rol(data['decision']),
+    rhApprovedBy: by(data['aprobacionRh']),
+    bossApprovedBy: by(data['aprobacionJefatura']),
   };
 }
 

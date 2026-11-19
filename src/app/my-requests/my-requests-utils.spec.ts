@@ -8,7 +8,7 @@ import {
   monthOptions,
   overtimeRows,
   statusText,
-  vacationPendingText,
+  pendingText,
   vacationRows,
 } from './my-requests-utils';
 
@@ -35,8 +35,8 @@ describe('my requests', () => {
 
   it('says when RH approved and the jefatura is missing', () => {
     const r = vacation('a', 'me', '2026-11-10T08:00');
-    expect(vacationPendingText(r)).toBe('Pendiente');
-    expect(vacationPendingText({ ...r, rhApprovedBy: 'uidKatia' })).toBe('Pendiente · falta la jefatura');
+    expect(pendingText(r)).toBe('Pendiente');
+    expect(pendingText({ ...r, rhApprovedBy: 'uidKatia' })).toBe('Pendiente · falta la jefatura');
   });
 
   it('shows only my vacations, newest first', () => {
@@ -69,6 +69,23 @@ describe('my requests', () => {
     expect(row.detail).toBe('3 h · 3 h 1.5x');
     expect(row.statusText).toBe('Aprobada');
     expect(overtimeRows([r], 'someone')).toHaveLength(0);
+  });
+
+  it('tells the worker when RH approved their overtime and the jefatura is missing', () => {
+    const r: OvertimeRequest = {
+      id: 'o',
+      ownerId: 'me',
+      employee: 'x',
+      start: '2026-11-18T17:00',
+      end: '2026-11-18T20:00',
+      task: 'Respaldo',
+      rhReviewed: true,
+      status: 'pendiente',
+    };
+    expect(overtimeRows([r], 'me')[0].statusText).toBe('Pendiente');
+    expect(overtimeRows([{ ...r, rhApprovedBy: 'uidKatia' }], 'me')[0].statusText).toBe(
+      'Pendiente · falta la jefatura',
+    );
   });
 });
 

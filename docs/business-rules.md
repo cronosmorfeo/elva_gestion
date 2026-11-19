@@ -22,6 +22,7 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 - Sundays and mandatory holidays pay **double** up to an 8-hour shift, then **triple**. Whether Saturday is also a rest day is _pending HR_ (`REST_WEEKDAYS` in `overtime-request/overtime-hours.ts`).
 - Shift plus overtime cannot exceed **12 hours a day**: up to 4 overtime hours on a workday, up to 12 on a rest day.
 - A request can cover up to one year.
+- **Who decides:** the same as vacations. RH can approve first as a check (`aprobacionRh`); the jefatura (role `admin`) gives the final approval (`aprobacionJefatura`), with a confirmation if RH has not approved yet. Either can reject (`decision.rol`). There is no balance to deduct.
 
 ## Employees
 

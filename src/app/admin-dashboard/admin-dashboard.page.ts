@@ -47,7 +47,7 @@ import {
   msUntilMidnight,
   quincenaLabel,
 } from './admin-dates';
-import type { Payee, PendingPayment, RequestStatus, VacationRequest } from './admin-requests';
+import type { Approvals, Payee, PendingPayment, RequestStatus, VacationRequest } from './admin-requests';
 import {
   formatColones,
   formatHours,
@@ -309,8 +309,9 @@ export class AdminDashboardPage {
       })),
   );
 
-  // The RH and Jefatura columns of a vacation, and whether this account can still give its approval.
-  private approvals(r: VacationRequest): {
+  // The RH and Jefatura columns of a request (vacations or overtime), and whether this account can
+  // still give its approval.
+  private approvals(r: Approvals & { status: RequestStatus }): {
     rh: ApprovalCell;
     jefatura: ApprovalCell;
     canDecide: boolean;
@@ -349,9 +350,7 @@ export class AdminDashboardPage {
         total: formatHours(overtimeMinutes(r)),
         pay: overtimePay(r),
         task: r.task,
-        rhReviewed: r.rhReviewed,
-        canDecide: r.status === 'pendiente' && r.rhReviewed,
-        waiting: r.status === 'pendiente' && !r.rhReviewed,
+        ...this.approvals(r),
         status: r.status,
         reason: r.reason ?? '',
       })),
@@ -519,13 +518,16 @@ export class AdminDashboardPage {
 
   async decideOvertime(id: string, status: RequestStatus): Promise<void> {
     const request = this.overtime().find((r) => r.id === id);
-    if (!request) return;
+    const as = this.approver();
+    this.confirmApproveId.set(null);
+    if (!request || !as) return;
     if (status === 'rechazada') {
       this.openReject('horas', id, request.employee);
       return;
     }
+    let result: 'parcial' | 'aprobada';
     try {
-      await this.store.approveOvertime(id);
+      result = await this.store.approveOvertime(id, as);
     } catch (err) {
       const message =
         err instanceof ApproveError
@@ -534,6 +536,13 @@ export class AdminDashboardPage {
       if (!(err instanceof ApproveError)) console.error('[AdminDashboard] Could not approve the overtime:', err);
       const toast = await this.toast.create({ message, duration: 5000, position: 'bottom' });
       await toast.present();
+      return;
+    }
+    if (result === 'parcial') {
+      await this.log(
+        `${this.profileName() || 'Vos'} aprobó las horas extra de ${request.employee} (RH)`,
+        'Aprobación de RH guardada. Falta la jefatura.',
+      );
       return;
     }
     await this.logDecision(`las horas extra de ${request.employee}`, status);
@@ -566,15 +575,11 @@ export class AdminDashboardPage {
 
   async confirmReject(): Promise<void> {
     const r = this.rejecting();
-    if (!r || this.rejectError() || this.rejectSaving()) return;
+    const as = this.approver();
+    if (!r || !as || this.rejectError() || this.rejectSaving()) return;
     this.rejectSaving.set(true);
     try {
-      await this.store.rejectRequest(
-        r.kind,
-        r.id,
-        r.reason,
-        r.kind === 'vacaciones' ? (this.approver() ?? undefined) : undefined,
-      );
+      await this.store.rejectRequest(r.kind, r.id, r.reason, as);
     } catch (err) {
       const message =
         err instanceof ApproveError

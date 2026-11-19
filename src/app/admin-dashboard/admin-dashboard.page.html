@@ -238,6 +238,8 @@
                     <th>Cuándo</th>
                     <th>Horas y pago</th>
                     <th>Qué va a hacer</th>
+                    <th>RH</th>
+                    <th>Jefatura</th>
                     <th class="right">Decisión</th>
                   </tr>
                 </thead>
@@ -254,18 +256,32 @@
                       <span class="muted">{{ row.pay }}</span>
                     </td>
                     <td class="task">{{ row.task }}</td>
+                    <td><span [class]="'chip ' + row.rh.tone">{{ row.rh.text }}</span></td>
+                    <td><span [class]="'chip ' + row.jefatura.tone">{{ row.jefatura.text }}</span></td>
                     <td class="right">
-                      @if (row.canDecide) {
+                      @if (row.canDecide && confirmApproveId() === row.id) {
+                      <span class="muted inline">RH todavía no la ha aprobado. ¿Aprobar de todos modos?</span>
+                      <div class="actions">
+                        <button type="button" class="btn ghost small" (click)="confirmApproveId.set(null)">No</button>
+                        <button type="button" class="btn primary small" (click)="decideOvertime(row.id, 'aprobada')">
+                          Sí, aprobar
+                        </button>
+                      </div>
+                      } @else if (row.canDecide) {
                       <div class="actions">
                         <button type="button" class="btn danger" (click)="decideOvertime(row.id, 'rechazada')">
                           Rechazar
                         </button>
-                        <button type="button" class="btn primary" (click)="decideOvertime(row.id, 'aprobada')">
+                        <button
+                          type="button"
+                          class="btn primary"
+                          (click)="row.needsConfirm ? confirmApproveId.set(row.id) : decideOvertime(row.id, 'aprobada')"
+                        >
                           Aprobar
                         </button>
                       </div>
                       } @else if (row.waiting) {
-                      <span class="muted inline">Espera a RH</span>
+                      <span class="muted inline">{{ row.waiting }}</span>
                       } @else if (row.status === 'aprobada') {
                       <span class="chip ok">Aprobada</span>
                       } @else if (row.status === 'cancelada') {
@@ -279,7 +295,7 @@
                   </tr>
                   } @empty {
                   <tr>
-                    <td colspan="5" class="empty">No hay solicitudes aquí.</td>
+                    <td colspan="7" class="empty">No hay solicitudes aquí.</td>
                   </tr>
                   }
                 </tbody>

@@ -351,7 +351,7 @@
     "overtime_requests": {
       "ruta": "overtime_requests/{id}",
       "descripcion": "Una por pedido de horas extra (antes de trabajarlas).",
-      "escribe": "El trabajador crea y puede cancelar; admin/rh aprueban o rechazan.",
+      "escribe": "El trabajador crea y puede cancelar; rh aprueba primero (opcional), la jefatura (admin) da la aprobación final y cualquiera rechaza. Igual que vacaciones.",
       "lee": "El dueño y admin/rh.",
       "campos": {
         "uid": {
@@ -398,7 +398,17 @@
         "decision": {
           "tipo": "map",
           "requerido": false,
-          "descripcion": "{ por, fecha } o { por, fecha, motivo } al rechazar"
+          "descripcion": "{ por, fecha } al aprobar (lo pone la jefatura); { por, fecha, motivo, rol } al rechazar (rol: rh o jefatura)"
+        },
+        "aprobacionRh": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por, fecha }: aprobación de RH (revisión previa, opcional)"
+        },
+        "aprobacionJefatura": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ por, fecha }: aprobación final de la jefatura (Félix o Vanessa)"
         },
         "cancelacion": {
           "tipo": "map",
@@ -567,7 +577,7 @@
   "todaviaNoEnFirestore": {
     "pagos": "Pagos pendientes del panel: datos de ejemplo (admin-sample-data.ts). Se conectan cuando RH pase el Excel de planilla.",
     "actividad": "Actividad reciente del panel: solo en memoria, se borra al recargar. Propuesta: colección actividad (solo crear).",
-    "revisionRh": "Ya está en Firestore para vacaciones (aprobacionRh, ver vacations_requests). rhReviewed siempre es true; en horas extra queda sin uso.",
+    "revisionRh": "Ya está en Firestore para vacaciones y horas extra (aprobacionRh). rhReviewed siempre es true y ya no se usa para decidir.",
     "archivosDeReportes": "Firebase Storage (pide plan Blaze)."
   },
   "calculadosSinGuardar": {
@@ -628,8 +638,8 @@
     "dashboard.horasExtra": {
       "fuente": ["overtime_requests"],
       "acciones": {
-        "Aprobar": "estado = aprobada, decision",
-        "Rechazar": "transacción con motivo"
+        "Aprobar": "transacción. RH: guarda aprobacionRh y sigue pendiente. Jefatura: guarda aprobacionJefatura, estado = aprobada y decision (si RH no aprobó, pide confirmar)",
+        "Rechazar": "transacción con motivo y rol (rh o jefatura)"
       }
     },
     "dashboard.cambiosDeCuenta": {
@@ -676,7 +686,7 @@
     "colaboradores": "lee el dueño o admin; escribe admin; nadie cambia su propio tipo_colaborador, activo ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
     "privado/pago": "lee el dueño o admin; escribe admin, nunca sobre su propia cuenta",
     "bank_change_requests": "crea el dueño con estado pendiente; lee el dueño o admin; actualiza admin",
-    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin/rh deciden (en vacaciones: rh solo escribe aprobacionRh y admin solo aprobacionJefatura; estado aprobada solo junto con aprobacionJefatura)",
+    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin/rh deciden (en vacaciones y horas extra: rh solo escribe aprobacionRh y admin solo aprobacionJefatura; estado aprobada solo junto con aprobacionJefatura)",
     "config/featureFlags": "lee cualquiera con sesión; nadie escribe desde la página",
     "devolucionDeDias": "Hoy el navegador del trabajador devuelve los días al cancelar. La regla solo debe permitir sumar decision.diasDescontados de esa solicitud, o hacerlo en una Cloud Function.",
     "weekly_reports": "crea el dueño con visto == null; lee dueño o admin; admin cambia visto",

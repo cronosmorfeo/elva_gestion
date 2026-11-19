@@ -25,7 +25,7 @@ Internal HR app for ELVA IA. Employees request vacations and overtime; admins an
 
 **Admins and HR** (`/tabs/dashboard`)
 
-- Approve or reject requests (a reason is required), with search, month filter and a warning when vacations overlap.
+- Approve or reject requests (a reason is required), with search, month filter and a warning when vacations overlap. For vacations, HR can approve first and the jefatura (role `admin`) gives the final approval.
 - Vacation balance grows 1 day per full month (12 per year by default), is deducted on approval and returned if the worker cancels.
 - Manage employees and their payment accounts, publish notices and read weekly reports.
 

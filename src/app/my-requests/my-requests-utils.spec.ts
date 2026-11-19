@@ -8,6 +8,7 @@ import {
   monthOptions,
   overtimeRows,
   statusText,
+  vacationPendingText,
   vacationRows,
 } from './my-requests-utils';
 
@@ -30,6 +31,12 @@ describe('my requests', () => {
     expect(statusText('aprobada', true)).toBe('Aprobada');
     expect(statusText('rechazada', true)).toBe('Rechazada');
     expect(statusText('cancelada', true)).toBe('Cancelada');
+  });
+
+  it('says when RH approved and the jefatura is missing', () => {
+    const r = vacation('a', 'me', '2026-11-10T08:00');
+    expect(vacationPendingText(r)).toBe('Pendiente');
+    expect(vacationPendingText({ ...r, rhApprovedBy: 'uidKatia' })).toBe('Pendiente · falta la jefatura');
   });
 
   it('shows only my vacations, newest first', () => {

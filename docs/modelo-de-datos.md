@@ -13,7 +13,7 @@ El modelo completo está en **`modelo-de-datos.json`**, en esta misma carpeta. E
 | Avisos                              | `colecciones.notices`                                                                                                               |
 | Reportes                            | `colecciones.weekly_reports`                                                                                                        |
 | Notificaciones                      | `colecciones.fcm_tokens`, `notificaciones`                                                                                          |
-| Lo que todavía no está en Firestore | `todaviaNoEnFirestore` (pagos, actividad, revisión de RH)                                                                           |
+| Lo que todavía no está en Firestore | `todaviaNoEnFirestore` (pagos, actividad)                                                                                           |
 | Permisos                            | `reglasFirestore` (hoy están abiertas)                                                                                              |
 
 **Cómo buscar:** en VS Code, `Ctrl+Shift+O` muestra las secciones del JSON y `Ctrl+F` busca una palabra. En GitHub, `Ctrl+F`.

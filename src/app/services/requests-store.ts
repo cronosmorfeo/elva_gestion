@@ -20,6 +20,8 @@ import {
 
 import type { OvertimeRequest, VacationRequest } from '../admin-dashboard/admin-requests';
 import { vacationDays } from '../admin-dashboard/admin-requests';
+import type { Approver } from '../admin-dashboard/decisions';
+import { APPROVAL_FIELDS } from '../admin-dashboard/decisions';
 import type { Notice, NoticeInput } from '../notices/notice-utils';
 import { localDateTime, sortNotices, unseenNotices } from '../notices/notice-utils';
 import type { Profile } from '../profile/profile-utils';
@@ -213,24 +215,35 @@ export class RequestsStore {
 
   // Rejects with a reason the worker will read. In a transaction, so a request the worker just
   // cancelled, or another admin just decided, is not overwritten.
-  rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string): Promise<void> {
+  // `as` says which side rejects a vacation (RH or the jefatura); either one is enough.
+  rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string, as?: Approver): Promise<void> {
     return this.decidePending(kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id, {
       estado: 'rechazada',
-      decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim() },
+      decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim(), ...(as ? { rol: as } : {}) },
     });
   }
 
-  // Approves and deducts the days from colaboradores/{uid}.vacaciones_disponibles in one transaction:
-  // both are saved or neither is, and two admins approving at once only deduct once.
-  async approveVacation(id: string, ownerUid: string | undefined, days: number): Promise<ApproveResult> {
+  // RH's approval is a check before the jefatura: it is saved and the request stays pending.
+  // The jefatura's approval is final (with or without RH's): it approves and deducts the days from
+  // colaboradores/{uid}.vacaciones_disponibles in one transaction, so everything is saved or nothing is,
+  // and two people approving at once only deduct once.
+  async approveVacation(id: string, ownerUid: string | undefined, days: number, as: Approver): Promise<ApproveResult> {
     const db = getFirestore();
     const requestRef = doc(db, COLLECTIONS.vacations, id);
     return runTransaction(db, async (tx) => {
       const request = await tx.get(requestRef);
       if (!request.exists()) throw new ApproveError('no-existe');
-      const estado: unknown = request.data()['estado'];
+      const data = request.data();
+      const estado: unknown = data['estado'];
       if (estado === 'cancelada') throw new ApproveError('cancelada');
       if (estado && estado !== 'pendiente') throw new ApproveError('ya-decidida');
+      const field = APPROVAL_FIELDS[as];
+      if (data[field]) throw new ApproveError('ya-aprobo');
+      const approval = { por: this.uid, fecha: serverTimestamp() };
+      if (as === 'rh') {
+        tx.update(requestRef, { [field]: approval });
+        return { kind: 'parcial' };
+      }
       const ownerRef = ownerUid ? doc(db, 'colaboradores', ownerUid) : null;
       const owner = ownerRef ? await tx.get(ownerRef) : null;
       const ownerData = owner?.data();
@@ -242,6 +255,7 @@ export class RequestsStore {
       }
       const deducted = check.kind === 'descontar' ? days : 0;
       tx.update(requestRef, {
+        [field]: approval,
         estado: 'aprobada',
         decision: { por: this.uid, fecha: serverTimestamp(), diasDescontados: deducted },
       });

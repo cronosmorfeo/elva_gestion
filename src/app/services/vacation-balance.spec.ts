@@ -64,6 +64,7 @@ describe('approveProblemText', () => {
       'Ana Solís tiene solo 1 día de vacaciones. No se aprobó.',
     );
     expect(approveProblemText('ya-decidida', 'Ana Solís', 0)).toBe('Esa solicitud ya fue decidida por otra persona.');
+    expect(approveProblemText('ya-aprobo', 'Ana Solís', 0)).toBe('Esa aprobación ya la había dado otra persona.');
   });
 
   it('keeps the problem in the error', () => {

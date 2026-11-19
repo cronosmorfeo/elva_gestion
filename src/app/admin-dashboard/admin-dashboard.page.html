@@ -130,6 +130,7 @@
                     <th>Empleado</th>
                     <th>Fechas</th>
                     <th>Días</th>
+                    <th>RH</th>
                     <th>Jefatura</th>
                     <th class="right">Decisión</th>
                   </tr>
@@ -146,29 +147,32 @@
                     </td>
                     <td>{{ row.start }} <span class="muted inline">→ vuelve</span> {{ row.returnDate }}</td>
                     <td class="num">{{ row.days }}</td>
-                    <td>
-                      <span
-                        class="chip"
-                        [class.warn]="row.status === 'pendiente'"
-                        [class.ok]="row.status === 'aprobada'"
-                        [class.rejected]="row.status === 'rechazada'"
-                        [class.off]="row.status === 'cancelada'"
-                      >
-                        {{ row.jefatura }}
-                      </span>
-                    </td>
+                    <td><span [class]="'chip ' + row.rh.tone">{{ row.rh.text }}</span></td>
+                    <td><span [class]="'chip ' + row.jefatura.tone">{{ row.jefatura.text }}</span></td>
                     <td class="right">
-                      @if (row.canDecide) {
+                      @if (row.canDecide && confirmApproveId() === row.id) {
+                      <span class="muted inline">RH todavía no la ha aprobado. ¿Aprobar de todos modos?</span>
+                      <div class="actions">
+                        <button type="button" class="btn ghost small" (click)="confirmApproveId.set(null)">No</button>
+                        <button type="button" class="btn primary small" (click)="decideVacation(row.id, 'aprobada')">
+                          Sí, aprobar
+                        </button>
+                      </div>
+                      } @else if (row.canDecide) {
                       <div class="actions">
                         <button type="button" class="btn danger" (click)="decideVacation(row.id, 'rechazada')">
                           Rechazar
                         </button>
-                        <button type="button" class="btn primary" (click)="decideVacation(row.id, 'aprobada')">
+                        <button
+                          type="button"
+                          class="btn primary"
+                          (click)="row.needsConfirm ? confirmApproveId.set(row.id) : decideVacation(row.id, 'aprobada')"
+                        >
                           Aprobar
                         </button>
                       </div>
                       } @else if (row.waiting) {
-                      <span class="muted inline">La decide la jefatura</span>
+                      <span class="muted inline">{{ row.waiting }}</span>
                       } @else if (row.status === 'aprobada') {
                       <span class="chip ok">Aprobada</span>
                       } @else if (row.status === 'cancelada') {
@@ -182,7 +186,7 @@
                   </tr>
                   } @empty {
                   <tr>
-                    <td colspan="5" class="empty">No hay solicitudes aquí.</td>
+                    <td colspan="6" class="empty">No hay solicitudes aquí.</td>
                   </tr>
                   }
                 </tbody>

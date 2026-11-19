@@ -87,6 +87,11 @@ export function statusText(status: RequestStatus, rhReviewed: boolean): string {
   return rhReviewed ? 'Pendiente' : 'Pendiente · en revisión de RH';
 }
 
+// A pending vacation waits for the jefatura; the worker sees when RH already approved it.
+export function vacationPendingText(r: VacationRequest): string {
+  return r.rhApprovedBy ? 'Pendiente · falta la jefatura' : 'Pendiente';
+}
+
 function sentText(sentAt?: string): string {
   return sentAt ? `Enviada el ${formatShortDate(sentAt)}, ${formatTime(sentAt)}` : '';
 }
@@ -108,7 +113,7 @@ export function vacationRows(list: VacationRequest[], ownerId: string): RequestR
         note: r.comment ?? '',
         sent: sentText(r.sentAt),
         status: r.status,
-        statusText: statusText(r.status, r.rhReviewed),
+        statusText: r.status === 'pendiente' ? vacationPendingText(r) : statusText(r.status, r.rhReviewed),
         month: r.start.slice(0, 7),
         start: r.start,
         returnDays: r.status === 'aprobada' ? (r.deductedDays ?? 0) : 0,

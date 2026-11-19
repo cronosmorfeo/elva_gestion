@@ -3,17 +3,25 @@ import type { RequestStatus, VacationRequest } from './admin-requests';
 
 export const MAX_REASON = 200;
 
-// Vacations are decided by the jefatura: accounts with role admin (Félix or Vanessa). RH sees them but does not decide.
-export const isJefatura = (tipo: unknown): boolean => typeof tipo === 'string' && tipo.trim().toLowerCase() === 'admin';
+// Vacations are approved by the jefatura (role admin: Félix or Vanessa, either one); that approval is final.
+// RH (role rh) can approve first as a check, but the jefatura does not have to wait for it.
+// Either RH or the jefatura can reject it, and that is final too.
+export type Approver = 'rh' | 'jefatura';
 
-// The Jefatura column: who approved or rejected a vacation. `who` is that admin's name ('' if unknown).
-export function jefaturaText(status: RequestStatus, who: string): string {
-  const name = who.trim().split(/\s+/)[0] ?? '';
-  if (status === 'pendiente') return 'Pendiente';
-  if (status === 'rechazada') return name ? `Rechazó ${name}` : 'Rechazada';
-  // An approved vacation that the worker cancelled keeps who approved it.
-  if (status === 'aprobada' || name) return name ? `Aprobó ${name}` : 'Aprobada';
-  return '—';
+export const APPROVAL_FIELDS: Record<Approver, string> = { rh: 'aprobacionRh', jefatura: 'aprobacionJefatura' };
+
+// Which approval an account gives, or null if it gives none.
+export function approverOf(tipo: unknown): Approver | null {
+  const value = typeof tipo === 'string' ? tipo.trim().toLowerCase() : '';
+  return value === 'admin' ? 'jefatura' : value === 'rh' ? 'rh' : null;
+}
+
+// One approval column (RH or Jefatura). The names are '' when unknown.
+export function approvalText(status: RequestStatus, approvedBy: string, rejectedBy: string): string {
+  const first = (name: string): string => name.trim().split(/\s+/)[0] ?? '';
+  if (status === 'rechazada' && rejectedBy) return `Rechazó ${first(rejectedBy)}`;
+  if (approvedBy) return `Aprobó ${first(approvedBy)}`;
+  return status === 'pendiente' ? 'Pendiente' : '—';
 }
 
 // What is wrong with a rejection reason, or '' when it can be saved. The worker reads it.

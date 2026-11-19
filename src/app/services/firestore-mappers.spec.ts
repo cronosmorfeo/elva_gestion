@@ -33,9 +33,21 @@ describe('toVacationRequest', () => {
     });
   });
 
-  it('reads who decided it', () => {
-    expect(toVacationRequest('abc', { ...vacation, decision: { por: 'uidFelix' } })?.decidedBy).toBe('uidFelix');
-    expect(toVacationRequest('abc', vacation)?.decidedBy).toBeUndefined();
+  it('reads who approved and who decided it', () => {
+    const r = toVacationRequest('abc', {
+      ...vacation,
+      aprobacionRh: { por: 'uidKatia' },
+      aprobacionJefatura: { por: 'uidFelix' },
+      decision: { por: 'uidFelix', rol: 'jefatura' },
+    });
+    expect(r?.rhApprovedBy).toBe('uidKatia');
+    expect(r?.bossApprovedBy).toBe('uidFelix');
+    expect(r?.decidedBy).toBe('uidFelix');
+    expect(r?.decidedAs).toBe('jefatura');
+    const empty = toVacationRequest('abc', { ...vacation, decision: { rol: 'otro' } });
+    expect(empty?.decidedBy).toBeUndefined();
+    expect(empty?.decidedAs).toBeUndefined();
+    expect(empty?.rhApprovedBy).toBeUndefined();
   });
 
   it('reads a half day and ignores unknown values', () => {

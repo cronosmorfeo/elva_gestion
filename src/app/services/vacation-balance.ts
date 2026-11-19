@@ -62,9 +62,10 @@ export function availableDays(balance: number | null, pendingDays: number): numb
   return balance === null ? null : Math.max(0, balance - pendingDays);
 }
 
-export type ApproveResult = { kind: 'descontado'; next: number } | { kind: 'sin-saldo' };
+// 'parcial': this approval was saved and the request waits for the other one (RH or the jefatura).
+export type ApproveResult = { kind: 'descontado'; next: number } | { kind: 'sin-saldo' } | { kind: 'parcial' };
 
-export type ApproveProblem = 'no-existe' | 'ya-decidida' | 'cancelada' | 'insuficiente';
+export type ApproveProblem = 'no-existe' | 'ya-decidida' | 'cancelada' | 'insuficiente' | 'ya-aprobo';
 
 // Thrown inside the approval transaction, so nothing is saved.
 export class ApproveError extends Error {
@@ -82,6 +83,7 @@ export function approveProblemText(problem: ApproveProblem, employee: string, ba
     return `${employee} tiene solo ${dayCount(balance)} de vacaciones. No se aprobó.`;
   }
   if (problem === 'ya-decidida') return 'Esa solicitud ya fue decidida por otra persona.';
+  if (problem === 'ya-aprobo') return 'Esa aprobación ya la había dado otra persona.';
   if (problem === 'cancelada') return `${employee} canceló esa solicitud.`;
   return 'Esa solicitud ya no existe.';
 }

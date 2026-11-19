@@ -1,5 +1,5 @@
 import type { VacationRequest } from './admin-requests';
-import { MAX_REASON, isJefatura, jefaturaText, reasonProblem, vacationConflicts } from './decisions';
+import { MAX_REASON, approvalText, approverOf, reasonProblem, vacationConflicts } from './decisions';
 
 const vac = (
   id: string,
@@ -10,22 +10,23 @@ const vac = (
   status: VacationRequest['status'] = 'aprobada',
 ): VacationRequest => ({ id, ownerId, employee, balance: 10, start, returnDate, rhReviewed: true, status });
 
-describe('jefatura', () => {
-  it('only the admin role decides vacations', () => {
-    expect(isJefatura('admin')).toBe(true);
-    expect(isJefatura(' Admin ')).toBe(true);
-    expect(isJefatura('rh')).toBe(false);
-    expect(isJefatura('regular')).toBe(false);
-    expect(isJefatura(undefined)).toBe(false);
+describe('vacation approvals', () => {
+  it('rh gives the RH approval and admin the jefatura one', () => {
+    expect(approverOf('rh')).toBe('rh');
+    expect(approverOf(' Admin ')).toBe('jefatura');
+    expect(approverOf('regular')).toBeNull();
+    expect(approverOf(undefined)).toBeNull();
   });
 
-  it('says who approved or rejected', () => {
-    expect(jefaturaText('pendiente', '')).toBe('Pendiente');
-    expect(jefaturaText('aprobada', 'Félix Rojas')).toBe('Aprobó Félix');
-    expect(jefaturaText('rechazada', 'Vanessa Mora')).toBe('Rechazó Vanessa');
-    expect(jefaturaText('aprobada', '')).toBe('Aprobada');
-    expect(jefaturaText('cancelada', 'Félix Rojas')).toBe('Aprobó Félix');
-    expect(jefaturaText('cancelada', '')).toBe('—');
+  it('says who approved or rejected in each column', () => {
+    expect(approvalText('pendiente', '', '')).toBe('Pendiente');
+    expect(approvalText('pendiente', 'Katia Mora', '')).toBe('Aprobó Katia');
+    expect(approvalText('aprobada', 'Félix Rojas', '')).toBe('Aprobó Félix');
+    expect(approvalText('rechazada', '', 'Vanessa Mora')).toBe('Rechazó Vanessa');
+    // The other column of a rejected request: approved before, or nothing.
+    expect(approvalText('rechazada', 'Katia Mora', '')).toBe('Aprobó Katia');
+    expect(approvalText('rechazada', '', '')).toBe('—');
+    expect(approvalText('cancelada', '', '')).toBe('—');
   });
 });
 

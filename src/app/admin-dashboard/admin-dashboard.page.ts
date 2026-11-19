@@ -62,7 +62,8 @@ import {
   upcomingHolidays,
   vacationDays,
 } from './admin-requests';
-import { MAX_REASON, isJefatura, jefaturaText, reasonProblem, vacationConflicts } from './decisions';
+import type { Approver } from './decisions';
+import { MAX_REASON, approvalText, approverOf, reasonProblem, vacationConflicts } from './decisions';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
@@ -165,8 +166,8 @@ export class AdminDashboardPage {
 
   readonly profileName = signal('');
   readonly profileRole = signal('');
-  // Only the jefatura (role admin) approves or rejects vacations; RH sees them.
-  readonly jefatura = signal(false);
+  // Which vacation approval this account gives: RH (role rh) or the jefatura (role admin). Both are needed.
+  readonly approver = signal<Approver | null>(null);
   readonly profileInitials = computed(() => initials(this.profileName() || 'Admin'));
 
   // Live from Firestore, shared with the worker pages, so decisions show up in "Mis solicitudes".
@@ -182,6 +183,8 @@ export class AdminDashboardPage {
     return f ? noticeProblem(f) : '';
   });
   readonly confirmDeleteId = signal<string | null>(null);
+  // The jefatura confirms before approving a vacation that RH has not approved yet.
+  readonly confirmApproveId = signal<string | null>(null);
   readonly confirmDeactivate = signal(false);
   readonly noticeRows = computed(() =>
     this.store.sortedNotices().map((n) => ({
@@ -299,14 +302,38 @@ export class AdminDashboardPage {
         days: r.halfDayFrom
           ? `${dayNumber(vacationDays(r))} (${halfDayText(r.halfDayFrom)})`
           : dayNumber(vacationDays(r)),
-        jefatura: jefaturaText(r.status, this.employees().find((e) => e.id === r.decidedBy)?.name ?? ''),
-        canDecide: r.status === 'pendiente' && this.jefatura(),
-        waiting: r.status === 'pendiente' && !this.jefatura(),
+        ...this.approvals(r),
         status: r.status,
         conflicts: r.status === 'pendiente' ? vacationConflicts(r, this.vacations()).join(', ') : '',
         reason: r.reason ?? '',
       })),
   );
+
+  // The RH and Jefatura columns of a vacation, and whether this account can still give its approval.
+  private approvals(r: VacationRequest): {
+    rh: ApprovalCell;
+    jefatura: ApprovalCell;
+    canDecide: boolean;
+    needsConfirm: boolean;
+    waiting: string;
+  } {
+    const name = (uid?: string): string => this.employees().find((e) => e.id === uid)?.name ?? '';
+    const rejected = r.status === 'rechazada';
+    // Requests decided before there were two approvals only have decision.por: that was the jefatura.
+    const boss = r.bossApprovedBy ?? (!r.rhApprovedBy && !rejected ? r.decidedBy : undefined);
+    const rh = approvalText(r.status, name(r.rhApprovedBy), rejected && r.decidedAs === 'rh' ? name(r.decidedBy) : '');
+    const jefatura = approvalText(r.status, name(boss), rejected && r.decidedAs !== 'rh' ? name(r.decidedBy) : '');
+    const as = this.approver();
+    const mine = as === 'rh' ? r.rhApprovedBy : as === 'jefatura' ? r.bossApprovedBy : undefined;
+    const pending = r.status === 'pendiente';
+    return {
+      rh: { text: rh, tone: tone(rh) },
+      jefatura: { text: jefatura, tone: tone(jefatura) },
+      canDecide: pending && !!as && !mine,
+      needsConfirm: as === 'jefatura' && !r.rhApprovedBy,
+      waiting: pending && as === 'rh' && mine ? 'Falta la jefatura' : '',
+    };
+  }
 
   readonly overtimeRows = computed(() =>
     this.shownOvertime()
@@ -448,7 +475,9 @@ export class AdminDashboardPage {
 
   async decideVacation(id: string, status: RequestStatus): Promise<void> {
     const request = this.vacations().find((r) => r.id === id);
-    if (!request || !this.jefatura()) return;
+    const as = this.approver();
+    this.confirmApproveId.set(null);
+    if (!request || !as) return;
     if (status === 'rechazada') {
       this.openReject('vacaciones', id, request.employee);
       return;
@@ -457,7 +486,7 @@ export class AdminDashboardPage {
     const days = vacationDays(request);
     let result: ApproveResult;
     try {
-      result = await this.store.approveVacation(id, owner?.id, days);
+      result = await this.store.approveVacation(id, owner?.id, days, as);
     } catch (err) {
       const message =
         err instanceof ApproveError
@@ -466,6 +495,13 @@ export class AdminDashboardPage {
       if (!(err instanceof ApproveError)) console.error('[AdminDashboard] Could not approve the vacation:', err);
       const toast = await this.toast.create({ message, duration: 5000, position: 'bottom' });
       await toast.present();
+      return;
+    }
+    if (result.kind === 'parcial') {
+      await this.log(
+        `${this.profileName() || 'Vos'} aprobó las vacaciones de ${request.employee} (RH)`,
+        'Aprobación de RH guardada. Falta la jefatura.',
+      );
       return;
     }
     if (result.kind === 'descontado' && owner) {
@@ -533,7 +569,12 @@ export class AdminDashboardPage {
     if (!r || this.rejectError() || this.rejectSaving()) return;
     this.rejectSaving.set(true);
     try {
-      await this.store.rejectRequest(r.kind, r.id, r.reason);
+      await this.store.rejectRequest(
+        r.kind,
+        r.id,
+        r.reason,
+        r.kind === 'vacaciones' ? (this.approver() ?? undefined) : undefined,
+      );
     } catch (err) {
       const message =
         err instanceof ApproveError
@@ -989,7 +1030,7 @@ export class AdminDashboardPage {
       const data = (await getDoc(doc(getFirestore(), 'colaboradores', user.uid))).data();
       this.profileName.set(String(data?.['nombre'] ?? user.displayName ?? ''));
       this.profileRole.set(roleLabel(data?.['tipo_colaborador']));
-      this.jefatura.set(isJefatura(data?.['tipo_colaborador']));
+      this.approver.set(approverOf(data?.['tipo_colaborador']));
     } catch {
       this.profileName.set(user.displayName ?? '');
     }
@@ -1053,6 +1094,17 @@ function balanceText(request: VacationRequest, employees: Employee[]): string {
 }
 
 // The real employee who sent a request: by uid, or by email for requests sent before the uid was saved.
+interface ApprovalCell {
+  text: string;
+  tone: 'ok' | 'rejected' | 'warn' | 'off';
+}
+
+function tone(text: string): ApprovalCell['tone'] {
+  if (text.startsWith('Aprobó')) return 'ok';
+  if (text.startsWith('Rechazó')) return 'rejected';
+  return text === 'Pendiente' ? 'warn' : 'off';
+}
+
 function ownerOf(request: VacationRequest, employees: Employee[]): Employee | undefined {
   return (
     employees.find((e) => e.id === request.ownerId) ?? employees.find((e) => !!e.email && e.email === request.email)

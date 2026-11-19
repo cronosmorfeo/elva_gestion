@@ -38,7 +38,10 @@ export function toVacationRequest(id: string, data: DocumentData): VacationReque
     status: status(data['estado']),
     ownerId: text(data['uid']) || undefined,
     deductedDays: deductedDays(data['decision']),
-    decidedBy: decidedBy(data['decision']),
+    decidedBy: by(data['decision']),
+    decidedAs: rol(data['decision']),
+    rhApprovedBy: by(data['aprobacionRh']),
+    bossApprovedBy: by(data['aprobacionJefatura']),
     halfDayFrom: HALF_DAY_STARTS.includes(text(data['medioDiaDesde'])) ? text(data['medioDiaDesde']) : undefined,
     reason: reason(data['decision']),
     comment: text(data['comentarioRRHH']) || undefined,
@@ -114,10 +117,16 @@ function reason(decision: unknown): string | undefined {
   return text(value) || undefined;
 }
 
-function decidedBy(decision: unknown): string | undefined {
-  const value: unknown =
-    typeof decision === 'object' && decision !== null ? (decision as Record<string, unknown>)['por'] : undefined;
+// The uid in `por` of a decision or approval map.
+function by(map: unknown): string | undefined {
+  const value: unknown = typeof map === 'object' && map !== null ? (map as Record<string, unknown>)['por'] : undefined;
   return text(value) || undefined;
+}
+
+function rol(decision: unknown): 'rh' | 'jefatura' | undefined {
+  const value: unknown =
+    typeof decision === 'object' && decision !== null ? (decision as Record<string, unknown>)['rol'] : undefined;
+  return value === 'rh' || value === 'jefatura' ? value : undefined;
 }
 
 function deductedDays(decision: unknown): number | undefined {

@@ -558,10 +558,15 @@
     },
     "feature_flags": {
       "ruta": "config/featureFlags",
-      "descripcion": "Prende o apaga partes de la página sin tocar el código. Un flag que falta, o el documento entero, cuenta como apagado: en el MVP solo se ven las vacaciones.",
-      "escribe": "Nadie desde la página; se edita en la consola de Firebase.",
+      "descripcion": "Prende o apaga partes de la página sin tocar el código. Si un flag falta (o el documento entero), vacaciones cuenta como prendido y los demás como apagados: en el MVP solo se ven las vacaciones.",
+      "escribe": "Solo la jefatura (admin): Administrar sistema en el panel y las semillas (SEEDS en services/system-admin.ts), que lo crean si falta. También se puede editar en la consola de Firebase.",
       "lee": "Cualquiera con sesión.",
       "campos": {
+        "vacaciones": {
+          "tipo": "boolean",
+          "requerido": false,
+          "descripcion": "Vacaciones (trabajador, panel, saldo en Inicio y Mi perfil). Por defecto prendido."
+        },
         "horasExtra": { "tipo": "boolean", "requerido": false, "descripcion": "Horas extra (trabajador y panel)" },
         "reportes": { "tipo": "boolean", "requerido": false, "descripcion": "Reportes semanales" },
         "avisos": { "tipo": "boolean", "requerido": false, "descripcion": "Avisos" },
@@ -571,7 +576,22 @@
           "descripcion": "Pagos pendientes, datos de pago (Mi perfil y Editar empleado) y cambios de cuenta"
         }
       },
-      "ejemplo": { "horasExtra": false, "reportes": false, "avisos": false, "pagos": false }
+      "ejemplo": { "vacaciones": true, "horasExtra": false, "reportes": false, "avisos": false, "pagos": false }
+    },
+    "seguridad": {
+      "ruta": "config/seguridad",
+      "descripcion": "Ajustes de seguridad. Si el documento o el campo falta, se usan los valores por defecto.",
+      "escribe": "Solo la jefatura (admin): Administrar sistema en el panel y las semillas (SEEDS en services/system-admin.ts), que lo crean si falta. También se puede editar en la consola de Firebase.",
+      "lee": "Cualquiera con sesión.",
+      "campos": {
+        "minutosInactividad": {
+          "tipo": "number (entero)",
+          "requerido": false,
+          "descripcion": "Minutos sin uso antes de cerrar la sesión (5 a 240; por defecto 30). Un minuto antes la página pregunta \"¿Sigue ahí?\". Un valor fuera de rango usa 30."
+        }
+      },
+      "notas": "La última actividad se comparte entre pestañas en el navegador (localStorage 'elva.ultimaActividad': { uid, at }). Se borra al cerrar sesión.",
+      "ejemplo": { "minutosInactividad": 30 }
     }
   },
   "todaviaNoEnFirestore": {
@@ -683,11 +703,12 @@
   "reglasFirestore": {
     "estadoActual": "ABIERTAS: allow read, write: if true. Hay que cambiarlas antes de usar datos reales.",
     "rolAdmin": "get(colaboradores/{request.auth.uid}).tipo_colaborador in ['admin','rh'] && activo == true",
-    "colaboradores": "lee el dueño o admin; escribe admin; nadie cambia su propio tipo_colaborador, activo ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
+    "colaboradores": "lee el dueño o admin; escribe admin; solo admin (jefatura) cambia tipo_colaborador o desactiva a un admin; nadie cambia su propio tipo_colaborador, activo ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
     "privado/pago": "lee el dueño o admin; escribe admin, nunca sobre su propia cuenta",
     "bank_change_requests": "crea el dueño con estado pendiente; lee el dueño o admin; actualiza admin",
     "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin/rh deciden (en vacaciones y horas extra: rh solo escribe aprobacionRh y admin solo aprobacionJefatura; estado aprobada solo junto con aprobacionJefatura)",
-    "config/featureFlags": "lee cualquiera con sesión; nadie escribe desde la página",
+    "config/featureFlags": "lee cualquier colaborador activo; escribe solo admin (jefatura)",
+    "config/seguridad": "lee cualquier colaborador activo; escribe solo admin (jefatura)",
     "devolucionDeDias": "Hoy el navegador del trabajador devuelve los días al cancelar. La regla solo debe permitir sumar decision.diasDescontados de esa solicitud, o hacerlo en una Cloud Function.",
     "weekly_reports": "crea el dueño con visto == null; lee dueño o admin; admin cambia visto",
     "notices": "lee cualquiera con sesión; escribe admin",

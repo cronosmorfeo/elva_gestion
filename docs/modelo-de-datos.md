@@ -31,6 +31,7 @@ El modelo completo está en **`modelo-de-datos.json`**, en esta misma carpeta. E
 | `weekly_reports/{id}`              | Reportes semanales (sin archivos todavía)     |
 | `users/{uid}/fcmTokens/{token}`    | Navegadores con notificaciones activadas      |
 | `config/featureFlags`              | Feature flags: qué secciones se ven           |
+| `config/seguridad`                 | Minutos sin uso antes de cerrar la sesión     |
 
 ## Reglas generales
 

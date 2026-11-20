@@ -24,17 +24,25 @@ if (config.apiKey) {
   });
 }
 
+// A new version of this file takes over right away instead of waiting for every tab of the app to close.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  // Only open URLs from our own origin.
+  // Only pages of our own origin.
   const target = new URL(event.notification.data?.url || '/', self.location.origin);
-  const url = target.origin === self.location.origin ? target.href : self.location.origin + '/';
+  const path = target.origin === self.location.origin ? target.pathname + target.search + target.hash : '/';
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      for (const w of windows) {
-        if (w.url === url && 'focus' in w) return w.focus();
-      }
-      return clients.openWindow(url);
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
+      // Reuse a tab of the app (the visible one if there is one) instead of opening a second copy.
+      const tabs = windows.filter((w) => new URL(w.url).origin === self.location.origin);
+      const tab = tabs.find((w) => w.visibilityState === 'visible') || tabs[0];
+      if (!tab) return clients.openWindow(path);
+      const focused = await tab.focus().catch(() => tab);
+      // The page moves with its own router (NotificationsService), so it does not reload.
+      focused.postMessage({ type: 'elva-open', url: path });
+      return focused;
     }),
   );
 });

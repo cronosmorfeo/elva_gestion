@@ -5,21 +5,21 @@
     <p class="intro">Un resumen rápido de lo suyo.</p>
 
     <div class="home-grid">
+      @if (flags().vacaciones) {
       <a class="card home-tile" routerLink="/tabs/vacaciones">
         <span class="home-label">Vacaciones</span>
         <strong class="home-value">{{ availableText() }}</strong>
         <span class="home-sub">{{ available() === null ? 'sin saldo registrado' : 'días disponibles' }}</span>
         <span class="home-go">Pedir vacaciones →</span>
       </a>
-
+      } @if (flags().vacaciones || flags().horasExtra) {
       <a class="card home-tile" routerLink="/tabs/solicitudes">
         <span class="home-label">Mis solicitudes</span>
         <strong class="home-value">{{ pending() }}</strong>
         <span class="home-sub">{{ pendingText() }}</span>
         <span class="home-go">Ver solicitudes →</span>
       </a>
-
-      @if (flags().avisos) {
+      } @if (flags().avisos) {
       <a class="card home-tile" routerLink="/tabs/avisos">
         <span class="home-label">Avisos</span>
         <strong class="home-value">{{ unseenNotices() }}</strong>

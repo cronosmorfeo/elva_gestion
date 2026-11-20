@@ -3,7 +3,7 @@
     <h1>Mis solicitudes</h1>
     <p class="intro">Acá ve las solicitudes que envió y si la administración las aprobó o las rechazó.</p>
 
-    @if (flags().horasExtra) {
+    @if (flags().vacaciones && flags().horasExtra) {
     <div class="filter" role="group" aria-label="Tipo de solicitud">
       <button
         type="button"

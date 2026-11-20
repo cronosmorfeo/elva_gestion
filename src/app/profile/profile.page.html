@@ -38,6 +38,7 @@
       </dl>
     </section>
 
+    @if (flags().vacaciones) {
     <section class="card profile-card" aria-labelledby="p-vac">
       <h2 id="p-vac">Vacaciones</h2>
       <dl class="profile-list">
@@ -54,8 +55,7 @@
         </dd>
       </dl>
     </section>
-
-    @if (flags().pagos) {
+    } @if (flags().pagos) {
     <section class="card profile-card" aria-labelledby="p-bank">
       <h2 id="p-bank">Datos de pago</h2>
       @if (!bankLoaded()) {

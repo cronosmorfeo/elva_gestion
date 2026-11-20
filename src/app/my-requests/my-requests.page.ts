@@ -29,8 +29,12 @@ export class MyRequestsPage {
   readonly loading = signal(true);
   readonly flags = inject(FeatureFlagsService).flags;
   private readonly pickedKind = signal<RequestKind>('vacaciones');
-  // Only vacations while overtime is turned off.
-  readonly kind = computed<RequestKind>(() => (this.flags().horasExtra ? this.pickedKind() : 'vacaciones'));
+  // With only one of vacations and overtime on, that one; with both, what the worker picked.
+  readonly kind = computed<RequestKind>(() => {
+    const { vacaciones, horasExtra } = this.flags();
+    if (vacaciones && horasExtra) return this.pickedKind();
+    return horasExtra ? 'horas' : 'vacaciones';
+  });
 
   readonly vacations = computed(() => {
     const w = this.worker();

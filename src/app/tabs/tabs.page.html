@@ -1,14 +1,15 @@
 @if (signedIn() && !ownHeader()) {
 <ng-template #navLinks>
   <a routerLink="/tabs/inicio" routerLinkActive="active" ariaCurrentWhenActive="page">Inicio</a>
+  @if (flags().vacaciones) {
   <a routerLink="/tabs/vacaciones" routerLinkActive="active" ariaCurrentWhenActive="page">Vacaciones</a>
-  @if (flags().horasExtra) {
+  } @if (flags().horasExtra) {
   <a routerLink="/tabs/horas-extra" routerLinkActive="active" ariaCurrentWhenActive="page">Horas extra</a>
   } @if (flags().reportes) {
   <a routerLink="/tabs/reporte" routerLinkActive="active" ariaCurrentWhenActive="page">Mi reporte</a>
-  }
+  } @if (flags().vacaciones || flags().horasExtra) {
   <a routerLink="/tabs/solicitudes" routerLinkActive="active" ariaCurrentWhenActive="page">Mis solicitudes</a>
-  @if (flags().avisos) {
+  } @if (flags().avisos) {
   <a routerLink="/tabs/avisos" routerLinkActive="active" ariaCurrentWhenActive="page">
     Avisos @if (unseenNotices() > 0) {
     <span class="badge" [attr.aria-label]="unseenNotices() + ' avisos nuevos'">{{ unseenNotices() }}</span>
@@ -68,3 +69,18 @@
 
 <ion-tabs></ion-tabs>
 <app-notification-cards />
+
+@if (idleSeconds() !== null) {
+<div class="idle-backdrop">
+  <div class="idle-box" role="alertdialog" aria-modal="true" aria-labelledby="idle-title" aria-describedby="idle-text">
+    <h2 id="idle-title">¿Sigue ahí?</h2>
+    <p id="idle-text">
+      Por seguridad, la sesión se va a cerrar en <strong>{{ idleSeconds() }} s</strong> porque la página está sin uso.
+    </p>
+    <div class="idle-actions">
+      <button type="button" class="idle-out" (click)="logout()">Cerrar sesión</button>
+      <button type="button" class="idle-stay" id="idle-stay" (click)="stillHere()">Sí, sigo aquí</button>
+    </div>
+  </div>
+</div>
+}

@@ -126,7 +126,7 @@ export class RequestsStore {
     this.listen(scoped(COLLECTIONS.vacations), (s) => {
       const list = sortBySent(mapDocs(s, toVacationRequest));
       this.vacations.set(list);
-      this.notify(vacationEvents(vacationsSeen, list, admin));
+      if (this.featureFlags.flags().vacaciones) this.notify(vacationEvents(vacationsSeen, list, admin));
       vacationsSeen = lastSeen(list);
     });
     this.listen(scoped(COLLECTIONS.overtime), (s) => {

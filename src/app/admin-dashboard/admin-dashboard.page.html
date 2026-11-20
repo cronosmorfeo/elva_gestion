@@ -47,6 +47,8 @@
         </div>
         @if (notifyState() === 'off') {
         <button type="button" class="logout" (click)="enableNotifications()">Activar notificaciones</button>
+        } @if (approver() === 'jefatura') {
+        <button type="button" class="logout" (click)="openSystem()">Administrar sistema</button>
         }
         <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
       </div>
@@ -62,6 +64,7 @@
       </header>
 
       <section class="kpis" aria-label="Resumen de solicitudes">
+        @if (flags().vacaciones) {
         <div class="kpi">
           <span class="label">Vacaciones pendientes</span>
           <span class="value warn">{{ summary().pendingVacations }}</span>
@@ -72,7 +75,7 @@
           <span class="value">{{ summary().approvedVacations }}</span>
           <span class="sub">{{ summary().approvedVacationDays }} en total</span>
         </div>
-        @if (flags().horasExtra) {
+        } @if (flags().horasExtra) {
         <div class="kpi">
           <span class="label">Horas extra pendientes</span>
           <span class="value warn">{{ summary().pendingOvertime }}</span>
@@ -88,6 +91,7 @@
 
       <div class="columns">
         <div class="col-main">
+          @if (flags().vacaciones) {
           <section id="vacaciones" class="card" aria-labelledby="t-vac">
             <div class="card-head">
               <h2 id="t-vac">Aprobar vacaciones</h2>
@@ -193,8 +197,7 @@
               </table>
             </div>
           </section>
-
-          @if (flags().horasExtra) {
+          } @if (flags().horasExtra) {
           <section id="horas-extra" class="card" aria-labelledby="t-he">
             <div class="card-head">
               <h2 id="t-he">Horas extra por aprobar</h2>
@@ -495,8 +498,7 @@
             <p class="empty left">No hay avisos publicados.</p>
             }
           </section>
-          }
-
+          } @if (flags().vacaciones) {
           <section class="card" aria-labelledby="t-semana">
             <h2 id="t-semana" class="small-title">De vacaciones esta semana</h2>
             @for (v of onVacation(); track v.id) {
@@ -508,6 +510,7 @@
             <p class="empty left">Nadie tiene vacaciones aprobadas esta semana.</p>
             }
           </section>
+          }
 
           <section class="card" aria-labelledby="t-fer">
             <h2 id="t-fer" class="small-title">Próximos feriados</h2>
@@ -680,6 +683,55 @@
         <button type="button" class="btn ghost" (click)="closeReports()">Cerrar</button>
         <button type="button" class="btn primary" [disabled]="h.unseen === 0" (click)="markAllSeen()">
           Marcar todos como vistos
+        </button>
+      </div>
+    </div>
+  </div>
+  } @if (systemOpen() && approver() === 'jefatura') {
+  <div class="modal-backdrop">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="system-title"
+      tabindex="-1"
+      (keydown.escape)="closeSystem()"
+    >
+      <div class="modal-head">
+        <div>
+          <h2 id="system-title">Administrar sistema</h2>
+          <span class="muted">Solo la jefatura ve esta ventana.</span>
+        </div>
+        <button type="button" class="icon-btn" id="system-close" aria-label="Cerrar" (click)="closeSystem()">✕</button>
+      </div>
+
+      <h3 class="edit-section">Secciones de la página</h3>
+      <p class="muted">Lo que apagues se oculta para todos al instante.</p>
+      @for (f of flagOptions; track f.id) {
+      <label class="switch" [for]="'flag-' + f.id">
+        <input
+          [id]="'flag-' + f.id"
+          type="checkbox"
+          [checked]="flags()[f.id]"
+          [disabled]="systemBusy()"
+          (change)="toggleFlag(f.id, $event)"
+        />
+        <span>{{ f.label }}: {{ flags()[f.id] ? 'activo' : 'apagado' }}</span>
+      </label>
+      }
+
+      <h3 class="edit-section">Colecciones</h3>
+      <p class="muted">Crea en Firebase la configuración que falte, sin cambiar lo que ya existe.</p>
+      @if (systemMessage()) {
+      <p class="muted" role="status">{{ systemMessage() }}</p>
+      } @if (systemError()) {
+      <p class="error-text" role="alert">{{ systemError() }}</p>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" (click)="closeSystem()">Cerrar</button>
+        <button type="button" class="btn primary" [disabled]="systemBusy()" (click)="runSeed()">
+          Actualizar colecciones
         </button>
       </div>
     </div>
@@ -940,13 +992,15 @@
       <div class="edit-grid">
         <div class="edit-field">
           <label for="edit-tipo">Tipo de cuenta</label>
-          <select id="edit-tipo" [value]="f.tipo" [disabled]="f.self" (change)="setEditField('tipo', $event)">
+          <select id="edit-tipo" [value]="f.tipo" [disabled]="!f.canChangeRole" (change)="setEditField('tipo', $event)">
             @for (r of roleOptions; track r.value) {
             <option [value]="r.value" [selected]="r.value === f.tipo">{{ r.label }}</option>
             }
           </select>
           @if (f.self) {
           <span class="muted">No podés cambiar tu propio tipo de cuenta.</span>
+          } @else if (!f.canChangeRole) {
+          <span class="muted">Solo la jefatura puede cambiar el tipo de cuenta.</span>
           }
         </div>
         <div class="edit-field">
@@ -956,13 +1010,15 @@
               id="edit-activo"
               type="checkbox"
               [checked]="f.activo"
-              [disabled]="f.self || f.locked || confirmDeactivate()"
+              [disabled]="!f.canDeactivate || f.locked || confirmDeactivate()"
               (change)="setEditActive($event)"
             />
             <span>{{ f.activo ? 'Activo: puede iniciar sesión' : 'Inactivo: no puede iniciar sesión' }}</span>
           </label>
           @if (f.self) {
           <span class="muted">No podés desactivar tu propia cuenta.</span>
+          } @else if (!f.canDeactivate && !f.locked) {
+          <span class="muted">Solo la jefatura puede desactivar una cuenta de Administrador.</span>
           } @else if (f.locked) {
           <span class="muted">Cuenta desactivada. Si vuelve a trabajar en ELVA, creale una cuenta nueva.</span>
           } @else if (confirmDeactivate()) {

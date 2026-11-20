@@ -35,6 +35,8 @@ module.exports = defineConfig([
           suffixes: ['Page', 'Component'],
         },
       ],
+      // console.log can leak personal data (salaries, IBAN) in the browser; errors and warnings are fine.
+      'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },
   {

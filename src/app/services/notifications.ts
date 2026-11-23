@@ -1,4 +1,5 @@
 import { Injectable, Injector, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 
 import type { BrowserNotice } from './notification-events';
 import { PushNotificationService } from './push-notification.service';
@@ -29,6 +30,15 @@ export class NotificationsService {
 
   readonly state = signal<NotifyState>(initialState());
   readonly cards = signal<NotificationCard[]>([]);
+
+  constructor() {
+    // A click on a system notification reuses the open tab: the service worker asks it to go to the page.
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
+      const url = pageToOpen(event.data);
+      if (url) void this.injector.get(Router).navigateByUrl(url);
+    });
+  }
 
   // Must run from a click: browsers only show the permission prompt after a user gesture.
   async enable(uid: string): Promise<NotifyState> {
@@ -146,4 +156,13 @@ function initialState(): NotifyState {
   if (!supported()) return 'unsupported';
   if (Notification.permission === 'granted') return 'on';
   return Notification.permission === 'denied' ? 'denied' : 'off';
+}
+
+// The page a notification click asks this tab to open: only a path inside the app ('/tabs/...'),
+// never another site ('//evil.com', 'https://...').
+export function pageToOpen(data: unknown): string | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const { type, url } = data as { type?: unknown; url?: unknown };
+  if (type !== 'elva-open' || typeof url !== 'string') return null;
+  return /^\/(?![/\\])/.test(url) ? url : null;
 }

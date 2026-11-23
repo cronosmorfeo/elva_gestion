@@ -19,7 +19,8 @@ import { chipDay, chipMonth, firstName, greeting, pendingCount, reportSentThisWe
 export class HomePage {
   private readonly store = inject(RequestsStore);
   readonly flags = inject(FeatureFlagsService).flags;
-  // Overtime is left out of the summary while it is turned off.
+  // Vacations and overtime are left out of the summary while they are turned off.
+  private readonly vacations = computed(() => (this.flags().vacaciones ? this.store.vacations() : []));
   private readonly overtime = computed(() => (this.flags().horasExtra ? this.store.overtime() : []));
 
   readonly name = signal('');
@@ -33,7 +34,7 @@ export class HomePage {
     const available = this.available();
     return available === null ? '—' : dayNumber(available);
   });
-  readonly pending = computed(() => pendingCount(this.store.vacations(), this.overtime(), this.store.myUid()));
+  readonly pending = computed(() => pendingCount(this.vacations(), this.overtime(), this.store.myUid()));
   readonly unseenNotices = this.store.unseenNotices;
   readonly latestNotice = computed(() => this.store.sortedNotices().at(0)?.title ?? 'No hay avisos');
   readonly pendingText = computed(() => {
@@ -43,7 +44,7 @@ export class HomePage {
   readonly reportSent = computed(() => reportSentThisWeek(this.store.reports(), this.store.myUid(), this.today()));
   readonly weekText = computed(() => weekLabel(mondayOf(this.today())));
   readonly upcoming = computed(() =>
-    upcomingItems(this.store.vacations(), this.overtime(), this.store.myUid(), this.today()).map((item) => ({
+    upcomingItems(this.vacations(), this.overtime(), this.store.myUid(), this.today()).map((item) => ({
       ...item,
       day: chipDay(item.date),
       month: chipMonth(item.date),

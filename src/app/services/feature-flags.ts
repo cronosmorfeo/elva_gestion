@@ -8,6 +8,7 @@ import { doc, getFirestore, onSnapshot } from 'firebase/firestore';
 // MVP for Costa Rica (Nov 2026): only vacations are on. A missing flag, a missing document or a read error
 // uses these defaults, so a section that is off never shows up by mistake.
 export interface FeatureFlags {
+  vacaciones: boolean; // vacation requests; the only one on by default (the MVP)
   horasExtra: boolean; // overtime requests (worker pages and dashboard)
   reportes: boolean; // weekly reports
   avisos: boolean; // notices
@@ -16,7 +17,13 @@ export interface FeatureFlags {
 
 export type FeatureFlag = keyof FeatureFlags;
 
-export const DEFAULT_FLAGS: FeatureFlags = { horasExtra: false, reportes: false, avisos: false, pagos: false };
+export const DEFAULT_FLAGS: FeatureFlags = {
+  vacaciones: true,
+  horasExtra: false,
+  reportes: false,
+  avisos: false,
+  pagos: false,
+};
 
 // Only booleans count; anything else keeps the default.
 export function toFlags(data: DocumentData | undefined): FeatureFlags {

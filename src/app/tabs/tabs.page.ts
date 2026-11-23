@@ -10,6 +10,7 @@ import { isAdminRole } from '../auth/admin.guard';
 import { isSignedIn } from '../auth/auth.guard';
 import { NotificationCardsComponent } from '../notification-cards/notification-cards.component';
 import { FeatureFlagsService } from '../services/feature-flags';
+import { IdleLogoutService } from '../services/idle-logout';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 
@@ -30,10 +31,12 @@ export class TabsPage {
   private readonly toast = inject(ToastController);
 
   private readonly featureFlags = inject(FeatureFlagsService);
+  private readonly idle = inject(IdleLogoutService);
 
   readonly notifyState = this.notifications.state;
   readonly flags = this.featureFlags.flags;
   readonly unseenNotices = this.store.unseenNotices;
+  readonly idleSeconds = this.idle.warningSeconds;
   readonly signedIn = signal(false);
   readonly isAdmin = signal(false);
   readonly ownHeader = signal(true);
@@ -45,6 +48,14 @@ export class TabsPage {
     // activo is only checked at login, so if an admin deactivates this account while it is open, sign out now.
     effect(() => {
       if (this.store.myProfile()?.active === false) void this.signOutDeactivated();
+    });
+
+    // When "¿Sigue ahí?" appears, put the focus on "Sí, sigo aquí" so Enter answers it.
+    let idleShown = false;
+    effect(() => {
+      const showing = this.idleSeconds() !== null;
+      if (showing && !idleShown) setTimeout(() => document.getElementById('idle-stay')?.focus());
+      idleShown = showing;
     });
 
     const destroyRef = inject(DestroyRef);
@@ -59,14 +70,24 @@ export class TabsPage {
     // Firebase is set up in main.ts; unit tests run without it.
     if (getApps().length === 0) return;
     const stop = onAuthStateChanged(getAuth(), (user) => {
+      const wasSignedIn = this.signedIn();
       this.signedIn.set(isSignedIn(user));
       this.isAdmin.set(false);
       if (user && isSignedIn(user)) {
         void this.featureFlags.load();
         void this.loadRole(user.uid);
-      } else this.store.forgetWorker();
+        this.idle.start(user.uid, Date.parse(user.metadata.lastSignInTime ?? ''), () => void this.signOutIdle());
+      } else {
+        this.idle.stop(true);
+        this.store.forgetWorker();
+        // Signed out in another tab (or by inactivity there): leave this page too, so nothing stays on screen.
+        if (wasSignedIn) void this.router.navigateByUrl('/tabs/login', { replaceUrl: true });
+      }
     });
-    destroyRef.onDestroy(stop);
+    destroyRef.onDestroy(() => {
+      stop();
+      this.idle.stop(false);
+    });
   }
 
   toggleMenu(): void {
@@ -94,6 +115,26 @@ export class TabsPage {
     await signOut(getAuth());
     this.store.forgetWorker();
     await this.router.navigateByUrl('/tabs/login', { replaceUrl: true });
+  }
+
+  stillHere(): void {
+    this.idle.stillHere();
+  }
+
+  private async signOutIdle(): Promise<void> {
+    if (this.leaving) return;
+    this.leaving = true;
+    try {
+      await this.logout();
+      const toast = await this.toast.create({
+        message: 'Por seguridad se cerró la sesión, porque la página estuvo sin uso. Inicie sesión de nuevo.',
+        duration: 8000,
+        position: 'bottom',
+      });
+      await toast.present();
+    } finally {
+      this.leaving = false;
+    }
   }
 
   private async signOutDeactivated(): Promise<void> {

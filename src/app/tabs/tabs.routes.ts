@@ -36,7 +36,7 @@ export const routes: Routes = [
       },
       {
         path: 'vacaciones',
-        canActivate: [authGuard],
+        canActivate: [authGuard, featureGuard('vacaciones')],
         loadComponent: () => import('../vacation-request/vacation-request.page').then((m) => m.VacationRequestPage),
       },
       {

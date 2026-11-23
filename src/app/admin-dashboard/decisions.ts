@@ -16,6 +16,20 @@ export function approverOf(tipo: unknown): Approver | null {
   return value === 'admin' ? 'jefatura' : value === 'rh' ? 'rh' : null;
 }
 
+// What the signed-in account may change in Edit employee. Only the jefatura (role admin) changes account
+// types and deactivates an Administrator, so RH cannot make an account admin (and then approve as the
+// jefatura) or lock Félix or Vanessa out. Nobody changes their own type or deactivates themselves,
+// and an account whose role is not known yet changes neither.
+export function editPermissions(
+  me: Approver | null,
+  targetTipo: string,
+  self: boolean,
+): { canChangeRole: boolean; canDeactivate: boolean } {
+  const boss = me === 'jefatura';
+  const targetIsBoss = approverOf(targetTipo) === 'jefatura';
+  return { canChangeRole: boss && !self, canDeactivate: me !== null && !self && (boss || !targetIsBoss) };
+}
+
 // One approval column (RH or Jefatura). The names are '' when unknown.
 export function approvalText(status: RequestStatus, approvedBy: string, rejectedBy: string): string {
   const first = (name: string): string => name.trim().split(/\s+/)[0] ?? '';

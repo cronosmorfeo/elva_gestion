@@ -13,6 +13,7 @@ import type { FeatureFlag } from '../services/feature-flags';
 import { FeatureFlagsService } from '../services/feature-flags';
 import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
+import { FLAG_LABELS, NotJefaturaError, SystemAdminService } from '../services/system-admin';
 import type { ApproveResult } from '../services/vacation-balance';
 import {
   ApproveError,
@@ -63,7 +64,7 @@ import {
   vacationDays,
 } from './admin-requests';
 import type { Approver } from './decisions';
-import { MAX_REASON, approvalText, approverOf, reasonProblem, vacationConflicts } from './decisions';
+import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
@@ -91,6 +92,8 @@ interface Employee {
 interface EditForm {
   id: string;
   self: boolean;
+  canChangeRole: boolean; // see editPermissions
+  canDeactivate: boolean;
   email: string;
   nombre: string;
   tipo: string;
@@ -117,7 +120,7 @@ type EditField =
 // A section with a flag only shows while that feature flag is on.
 const SECTIONS: { id: string; label: string; flag?: FeatureFlag }[] = [
   { id: 'resumen', label: 'Resumen' },
-  { id: 'vacaciones', label: 'Vacaciones' },
+  { id: 'vacaciones', label: 'Vacaciones', flag: 'vacaciones' },
   { id: 'horas-extra', label: 'Horas extra', flag: 'horasExtra' },
   { id: 'pagos', label: 'Pagos pendientes', flag: 'pagos' },
   { id: 'empleados', label: 'Empleados' },
@@ -149,6 +152,7 @@ export class AdminDashboardPage {
   private readonly store = inject(RequestsStore);
   private readonly notifications = inject(NotificationsService);
   private readonly featureFlags = inject(FeatureFlagsService);
+  private readonly system = inject(SystemAdminService);
 
   readonly notifyState = this.notifications.state;
   readonly flags = this.featureFlags.flags;
@@ -186,6 +190,13 @@ export class AdminDashboardPage {
   // The jefatura confirms before approving a vacation that RH has not approved yet.
   readonly confirmApproveId = signal<string | null>(null);
   readonly confirmDeactivate = signal(false);
+
+  // "Administrar sistema" (only the jefatura): feature flags and the configuration seeds.
+  readonly systemOpen = signal(false);
+  readonly systemBusy = signal(false);
+  readonly systemMessage = signal('');
+  readonly systemError = signal('');
+  readonly flagOptions = (Object.keys(FLAG_LABELS) as FeatureFlag[]).map((id) => ({ id, label: FLAG_LABELS[id] }));
   readonly noticeRows = computed(() =>
     this.store.sortedNotices().map((n) => ({
       ...n,
@@ -732,9 +743,11 @@ export class AdminDashboardPage {
     const e = this.employees().find((x) => x.id === id);
     if (!e) return;
     const times = parseScheduleText(e.horario);
+    const self = e.id === getAuth().currentUser?.uid;
     const form: EditForm = {
       id: e.id,
-      self: e.id === getAuth().currentUser?.uid,
+      self,
+      ...editPermissions(this.approver(), e.tipo || 'regular', self),
       email: e.email,
       nombre: e.name,
       tipo: e.tipo || 'regular',
@@ -890,17 +903,20 @@ export class AdminDashboardPage {
     const horario = scheduleText(f.horaInicio, f.horaFin);
     const before = JSON.parse(this.editOriginal()) as EditForm;
     const employee = this.employees().find((e) => e.id === f.id);
+    // The type and the deactivation are only saved when this account may change them (editPermissions).
+    const tipo = f.canChangeRole ? f.tipo : before.tipo;
+    const activo = (f.canDeactivate ? f.activo : before.activo) && !f.locked;
     const changes = {
       nombre: f.nombre.trim(),
-      tipo_colaborador: f.tipo,
+      ...(f.canChangeRole ? { tipo_colaborador: f.tipo } : {}),
       pais: f.pais,
       fechaIngreso: f.fechaIngreso,
       salario: f.salario,
       moneda: f.moneda,
       jornada: f.jornada,
       horarioLaborado: horario,
-      activo: f.activo && !f.locked,
-      ...(before.activo && !f.activo ? { desactivadoEl: localIsoDate(new Date()) } : {}),
+      activo,
+      ...(before.activo && !activo ? { desactivadoEl: localIsoDate(new Date()) } : {}),
       // The balance is only saved when it changed, so it never undoes an approval made meanwhile,
       // and employees without a balance stay that way. Earning starts the first time it is saved.
       ...(f.vacaciones !== '' &&
@@ -930,14 +946,14 @@ export class AdminDashboardPage {
             ? {
                 ...e,
                 name: changes.nombre,
-                role: roleLabel(changes.tipo_colaborador),
+                role: roleLabel(tipo),
                 schedule: SCHEDULES[changes.jornada] ?? '—',
                 startDate: formatShortDate(changes.fechaIngreso),
                 active: changes.activo,
                 inactiveSince: changes.desactivadoEl
                   ? `Desde ${formatShortDate(changes.desactivadoEl)}`
                   : e.inactiveSince,
-                tipo: changes.tipo_colaborador,
+                tipo,
                 jornada: changes.jornada,
                 horario,
                 fechaIngreso: changes.fechaIngreso,
@@ -1028,6 +1044,61 @@ export class AdminDashboardPage {
     destroyRef.onDestroy(() => clearTimeout(timer));
   }
 
+  openSystem(): void {
+    if (this.approver() !== 'jefatura') return;
+    this.systemMessage.set('');
+    this.systemError.set('');
+    this.systemOpen.set(true);
+    setTimeout(() => document.getElementById('system-close')?.focus());
+  }
+
+  closeSystem(): void {
+    this.systemOpen.set(false);
+  }
+
+  async toggleFlag(flag: FeatureFlag, event: Event): Promise<void> {
+    const value = (event.target as HTMLInputElement).checked;
+    if (this.approver() !== 'jefatura' || this.systemBusy()) return;
+    this.systemBusy.set(true);
+    this.systemError.set('');
+    this.systemMessage.set('');
+    try {
+      await this.system.setFlag(flag, value);
+      this.addActivity(`${this.profileName() || 'Vos'} ${value ? 'activó' : 'desactivó'} ${FLAG_LABELS[flag]}`);
+    } catch (err) {
+      (event.target as HTMLInputElement).checked = !value;
+      this.systemError.set(this.systemProblem(err));
+    } finally {
+      this.systemBusy.set(false);
+    }
+  }
+
+  async runSeed(): Promise<void> {
+    if (this.approver() !== 'jefatura' || this.systemBusy()) return;
+    this.systemBusy.set(true);
+    this.systemError.set('');
+    this.systemMessage.set('');
+    try {
+      const r = await this.system.seed();
+      const parts = [
+        r.created.length ? `Se creó: ${r.created.join(', ')}.` : '',
+        r.completed.length ? `Se completó: ${r.completed.join(', ')}.` : '',
+      ].filter(Boolean);
+      this.systemMessage.set(parts.length ? parts.join(' ') : 'Todo estaba al día. No se cambió nada.');
+      if (parts.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
+    } catch (err) {
+      this.systemError.set(this.systemProblem(err));
+    } finally {
+      this.systemBusy.set(false);
+    }
+  }
+
+  private systemProblem(err: unknown): string {
+    if (err instanceof NotJefaturaError) return err.message;
+    console.error('[SystemAdmin]', err);
+    return 'No se pudo guardar. Revisá la conexión e intentá de nuevo.';
+  }
+
   private async loadProfile(): Promise<void> {
     const user = getAuth().currentUser;
     if (!user) return;
@@ -1036,6 +1107,12 @@ export class AdminDashboardPage {
       this.profileName.set(String(data?.['nombre'] ?? user.displayName ?? ''));
       this.profileRole.set(roleLabel(data?.['tipo_colaborador']));
       this.approver.set(approverOf(data?.['tipo_colaborador']));
+      // Each Firebase project gets the configuration the code needs the first time the jefatura comes in.
+      if (this.approver() === 'jefatura') {
+        void this.system
+          .seed()
+          .catch((err: unknown) => console.error('[Seeds] Could not create the configuration:', err));
+      }
     } catch {
       this.profileName.set(user.displayName ?? '');
     }

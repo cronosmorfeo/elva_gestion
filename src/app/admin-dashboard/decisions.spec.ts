@@ -1,5 +1,5 @@
 import type { VacationRequest } from './admin-requests';
-import { MAX_REASON, approvalText, approverOf, reasonProblem, vacationConflicts } from './decisions';
+import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
 
 const vac = (
   id: string,
@@ -58,5 +58,29 @@ describe('vacationConflicts', () => {
 
   it('is empty when nobody overlaps', () => {
     expect(vacationConflicts(request, [request])).toEqual([]);
+  });
+});
+
+describe('editPermissions', () => {
+  it('lets the jefatura change types and deactivate anyone but themselves', () => {
+    expect(editPermissions('jefatura', 'regular', false)).toEqual({ canChangeRole: true, canDeactivate: true });
+    expect(editPermissions('jefatura', 'admin', false)).toEqual({ canChangeRole: true, canDeactivate: true });
+    expect(editPermissions('jefatura', 'admin', true)).toEqual({ canChangeRole: false, canDeactivate: false });
+  });
+
+  it('never lets RH change a type, so RH cannot make an account admin', () => {
+    expect(editPermissions('rh', 'regular', false).canChangeRole).toBe(false);
+    expect(editPermissions('rh', 'admin', false).canChangeRole).toBe(false);
+  });
+
+  it('lets RH deactivate workers and RH, but not Félix or Vanessa', () => {
+    expect(editPermissions('rh', 'regular', false).canDeactivate).toBe(true);
+    expect(editPermissions('rh', 'rh', false).canDeactivate).toBe(true);
+    expect(editPermissions('rh', 'admin', false).canDeactivate).toBe(false);
+    expect(editPermissions('rh', ' Admin ', false).canDeactivate).toBe(false);
+  });
+
+  it('gives nothing while the role is not known', () => {
+    expect(editPermissions(null, 'regular', false)).toEqual({ canChangeRole: false, canDeactivate: false });
   });
 });

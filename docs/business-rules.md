@@ -31,7 +31,7 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 
 ## Feature flags
 
-Parts of the app can be turned off without changing the code, with booleans in Firestore at `config/featureFlags` (edited in the Firebase console): `horasExtra`, `reportes`, `avisos` and `pagos`. A section that is off is hidden from the menus and the dashboard, its page sends back to Inicio, and its notifications are not shown. A missing flag, a missing document or a read error counts as off, so the MVP (Costa Rica) only shows vacations. Defaults and the list are in `src/app/services/feature-flags.ts`.
+Parts of the app can be turned off without changing the code, with booleans in Firestore at `config/featureFlags` (the jefatura turns them on and off in the dashboard, **Administrar sistema**, or in the Firebase console): `vacaciones`, `horasExtra`, `reportes`, `avisos` and `pagos`. A section that is off is hidden from the menus, Inicio and the dashboard, its page sends back to Inicio, and its notifications are not shown; Mis solicitudes only shows while vacations or overtime is on. **`vacaciones` is on by default** and every other flag is off by default: a missing flag, a missing document or a read error uses that default, so the MVP (Costa Rica) only shows vacations. Turning `vacaciones` off and `horasExtra` on shows only overtime. Defaults and the list are in `src/app/services/feature-flags.ts`.
 
 ## Requests
 

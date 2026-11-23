@@ -31,6 +31,8 @@ Internal HR app for ELVA IA. Employees request vacations and overtime; admins an
 
 Notifications reach admins (new or cancelled requests, account change requests) and workers (decisions, notices, account changes). Pending payments are not connected yet.
 
+The session closes after 30 minutes without use, with a warning one minute before (see [Security](docs/security.md#session-timeout)).
+
 ## Tech stack
 
 - **Ionic 9 + Angular 22** (standalone components, zoneless with signals)
@@ -77,7 +79,7 @@ Open `http://localhost:4200`. Both environment files are in `.gitignore` and are
 3. In **Project settings > Cloud Messaging > Web Push certificates**, generate a key and copy it into `firebaseVapidKey`.
 4. In **Authentication > Sign-in method**, enable **Email/Password**.
 5. Create a **Firestore Database**.
-6. Optional: create the document `config/featureFlags` with booleans `horasExtra`, `reportes`, `avisos` and `pagos` to turn those sections on. Without it, only vacations show (see [Business rules](docs/business-rules.md#feature-flags)).
+6. Sign in with an `admin` account and open the dashboard: the configuration documents (`config/featureFlags` with only `vacaciones` on, and `config/seguridad` with 30 minutes) are created on their own. **Administrar sistema** turns sections on and off and has "Actualizar colecciones" to create what is missing. To add a setting, add it to `SEEDS` in `src/app/services/system-admin.ts`; every project gets it the next time the jefatura comes in (see [Security](docs/security.md#administrar-sistema-and-seeds)).
 
 Push notifications with the page closed and file uploads need the **Blaze** plan; see [`functions/README.md`](functions/README.md).
 

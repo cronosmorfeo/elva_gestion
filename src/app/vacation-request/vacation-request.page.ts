@@ -96,15 +96,12 @@ export class VacationRequestPage implements OnInit {
   );
 
   async ngOnInit(): Promise<void> {
-    console.log('[VacationRequest] ngOnInit: Obteniendo colaborador actual desde el store...');
 
     try {
       const worker = await this.store.currentWorker();
-      console.log('[VacationRequest] Datos del colaborador obtenidos del store:', worker);
 
       if (worker && (worker as any).uid) {
         const uid = (worker as any).uid;
-        console.log(`[VacationRequest] UID del usuario logueado detectado: ${uid}`);
 
         // Obtener la instancia de Firestore y consultar directamente la colección 'colaboradores' usando el UID
         const db = getFirestore();
@@ -113,7 +110,6 @@ export class VacationRequestPage implements OnInit {
 
         if (snapshot.exists()) {
           const colaboradorData = snapshot.data();
-          console.log('[VacationRequest] MATCH ENCONTRADO en Firestore - Datos del colaborador:', colaboradorData);
 
           // Extraer nombre si está disponible
           if (colaboradorData['nombre']) {
@@ -122,7 +118,6 @@ export class VacationRequestPage implements OnInit {
 
           // Extraer correo si está disponible
           if (colaboradorData['correo']) {
-            console.log(`[VacationRequest] Correo detectado: ${colaboradorData['correo']}`);
             this.userEmail.set(colaboradorData['correo']);
           }
 
@@ -169,7 +164,6 @@ export class VacationRequestPage implements OnInit {
     }
     const days = this.deductedText();
     
-    console.log('[VacationRequest] Enviando solicitud de vacaciones con balance:', this.availableDays());
 
     // 2. Guardar en la colección 'vacations_requests' de Firestore
     try {
@@ -190,7 +184,6 @@ export class VacationRequestPage implements OnInit {
       };
 
       await addDoc(requestsRef, vacationRequestData);
-      console.log('[VacationRequest] Solicitud guardada exitosamente en Firestore (vacations_requests).');
     } catch (firebaseError) {
       console.error('[VacationRequest] Error al guardar en Firestore vacations_requests:', firebaseError);
       const failed = await this.toast.create({
@@ -235,4 +228,4 @@ function toRow(day: VacationDay): { key: string; kind: string; weekday: string; 
     date: `${Number(day.date.slice(8))} ${month}`,
     status,
   };
-}
+}

@@ -11,4 +11,7 @@ export const environment = {
     appId: '',
   },
   firebaseVapidKey: '',
+  // Optional: address of your push Worker (worker/README.md), e.g. 'https://elva-gestion-push.<you>.workers.dev'.
+  // Empty: no push with the page closed.
+  pushWorkerUrl: '',
 };

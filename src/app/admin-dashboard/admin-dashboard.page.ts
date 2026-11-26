@@ -66,6 +66,7 @@ import {
 } from './admin-requests';
 import type { Approver } from './decisions';
 import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
+import { myMenuLinks } from './my-menu';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
@@ -158,6 +159,9 @@ export class AdminDashboardPage {
   readonly notifyState = this.notifications.state;
   readonly flags = this.featureFlags.flags;
   readonly sections = computed(() => SECTIONS.filter((s) => !s.flag || this.flags()[s.flag]));
+  // "Mi menú": the worker pages for the person using the panel (their own vacations, overtime...).
+  readonly myLinks = computed(() => myMenuLinks(this.flags()));
+  readonly myMenuOpen = signal(false);
   readonly roleOptions = ROLE_OPTIONS;
   readonly countryOptions = COUNTRY_OPTIONS;
   readonly currencyOptions = CURRENCY_OPTIONS;
@@ -1066,8 +1070,13 @@ export class AdminDashboardPage {
     destroyRef.onDestroy(() => clearTimeout(timer));
   }
 
-  changePassword(): void {
-    void this.router.navigateByUrl('/tabs/contrasena');
+  toggleMyMenu(): void {
+    this.myMenuOpen.update((open) => !open);
+  }
+
+  openMine(path: string): void {
+    this.myMenuOpen.set(false);
+    void this.router.navigateByUrl(path);
   }
 
   openSystem(): void {

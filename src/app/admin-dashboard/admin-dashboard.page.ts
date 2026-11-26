@@ -911,7 +911,7 @@ export class AdminDashboardPage {
       ...(f.canChangeRole ? { tipo_colaborador: f.tipo } : {}),
       pais: f.pais,
       fechaIngreso: f.fechaIngreso,
-      salario: f.salario,
+      salario: f.self ? before.salario : f.salario,
       moneda: f.moneda,
       jornada: f.jornada,
       horarioLaborado: horario,
@@ -919,7 +919,9 @@ export class AdminDashboardPage {
       ...(before.activo && !activo ? { desactivadoEl: localIsoDate(new Date()) } : {}),
       // The balance is only saved when it changed, so it never undoes an approval made meanwhile,
       // and employees without a balance stay that way. Earning starts the first time it is saved.
-      ...(f.vacaciones !== '' &&
+      // Never on your own account: another admin changes your balance (the Firestore rules require it too).
+      ...(!f.self &&
+      f.vacaciones !== '' &&
       (f.vacaciones !== before.vacaciones || f.diasAnuales !== before.diasAnuales || !employee?.accrualFrom)
         ? {
             ...storedBalance(

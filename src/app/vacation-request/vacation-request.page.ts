@@ -4,15 +4,22 @@ import { Router } from '@angular/router';
 import { IonButton, IonContent, IonInput, IonTextarea, ToastController } from '@ionic/angular';
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- Añadido collection, addDoc, serverTimestamp
 
-import { addDays } from '../admin-dashboard/admin-dates';
+import { addDays, formatShortDate } from '../admin-dashboard/admin-dates';
 import { HALF_DAY_STARTS, halfDayEnd, halfDayText, timeLabel } from '../admin-dashboard/admin-requests';
 import { localDateTime } from '../notices/notice-utils';
+import { reportChange } from '../services/push-relay';
 import { RequestsStore } from '../services/requests-store';
 import { dayCount, dayNumber } from '../shared/day-count';
 
 import { holidaysBetween } from './holidays';
 import type { VacationDay } from './vacation-days';
-import { MAX_REQUEST_DAYS, countDeductedDays, listVacationDays, rangeLength } from './vacation-days';
+import {
+  MAX_REQUEST_DAYS,
+  countDeductedDays,
+  listVacationDays,
+  overlappingRequest,
+  rangeLength,
+} from './vacation-days';
 
 const WEEKDAYS = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -80,12 +87,27 @@ export class VacationRequestPage implements OnInit {
   readonly deductedText = computed(() => dayCount(this.deducted()));
   readonly balanceText = computed(() => dayCount(Math.abs(this.remaining())));
 
+  // A pending or approved request of this person with a day in common: asking again would deduct it twice.
+  readonly alreadyRequested = computed(() => {
+    const mine = this.store.vacations().filter((r) => r.ownerId === this.store.myUid());
+    const r = overlappingRequest(mine, this.start(), this.lastVacationDay());
+    if (!r) return '';
+    const last = r.returnDate > r.start ? addDays(r.returnDate, -1) : r.start;
+    const when =
+      last === r.start
+        ? `el ${formatShortDate(r.start)}`
+        : `del ${formatShortDate(r.start)} al ${formatShortDate(last)}`;
+    const state = r.status === 'aprobada' ? 'aprobadas' : 'pendientes';
+    return `Ya tiene vacaciones ${state} ${when}. No puede pedir los mismos días otra vez.`;
+  });
+
   readonly error = computed(() => {
     if (!this.start() || !this.end()) return '';
     if (this.start() < this.minStart) return 'El primer día no puede ser una fecha pasada.';
     if (this.end() < this.start()) return 'La fecha de reincorporación no puede ser antes del primer día.';
     if (this.tooLong()) return 'Una solicitud no puede ser de más de un año. Divídala en varias solicitudes.';
     if (this.deducted() === 0) return 'Las fechas elegidas no incluyen días laborales.';
+    if (this.alreadyRequested()) return this.alreadyRequested();
     if (!this.hasBalance()) return 'Todavía no tiene días de vacaciones registrados. Consulte con RH.';
     if (this.remaining() < 0) return `Solo tiene ${dayCount(this.availableDays())} disponibles.`;
     return '';
@@ -183,7 +205,8 @@ export class VacationRequestPage implements OnInit {
         ...(this.isHalfDay() ? { medioDiaDesde: this.halfDayFrom() } : {}),
       };
 
-      await addDoc(requestsRef, vacationRequestData);
+      const created = await addDoc(requestsRef, vacationRequestData);
+      reportChange('vacations_requests', created.id);
     } catch (firebaseError) {
       console.error('[VacationRequest] Error al guardar en Firestore vacations_requests:', firebaseError);
       const failed = await this.toast.create({
@@ -228,4 +251,4 @@ function toRow(day: VacationDay): { key: string; kind: string; weekday: string; 
     date: `${Number(day.date.slice(8))} ${month}`,
     status,
   };
-}
+}

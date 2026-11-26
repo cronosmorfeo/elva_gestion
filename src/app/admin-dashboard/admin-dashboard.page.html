@@ -900,9 +900,13 @@
               inputmode="numeric"
               placeholder="Ej. 450.000"
               [value]="f.salarioTexto"
+              [disabled]="f.self"
               (input)="setEditSalary($event)"
             />
           </div>
+          @if (f.self) {
+          <span class="muted">Tu salario lo cambia otro administrador.</span>
+          }
         </div>
         <div class="edit-field">
           <label for="edit-moneda">Moneda</label>
@@ -963,9 +967,12 @@
             [attr.maxlength]="5"
             [attr.aria-invalid]="!!editState()?.vacationError"
             [value]="f.vacaciones"
+            [disabled]="f.self"
             (input)="setEditVacation($event)"
           />
-          @if (editState()?.vacationError) {
+          @if (f.self) {
+          <span class="muted">Tus vacaciones las cambia otro administrador.</span>
+          } @else if (editState()?.vacationError) {
           <span class="error-text">{{ editState()?.vacationError }}</span>
           } @else {
           <span class="muted"
@@ -982,6 +989,7 @@
             inputmode="numeric"
             [attr.maxlength]="2"
             [value]="f.diasAnuales"
+            [disabled]="f.self"
             (input)="setEditPerYear($event)"
           />
           <span class="muted">12 al año = 1 día por mes.</span>

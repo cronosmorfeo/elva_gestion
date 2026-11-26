@@ -71,3 +71,27 @@ export function listVacationDays(start: string, end: string, holidays: Holiday[]
 export function countDeductedDays(days: VacationDay[]): number {
   return days.filter((d) => d.counts).length;
 }
+
+// One of the person's own vacation requests, as far as overlapping goes.
+export interface OwnRequest {
+  start: string; // first day off
+  returnDate: string; // first day back (same day as start for a half day)
+  status: string;
+}
+
+// The first pending or approved request of the person that shares a day off with start..lastDay
+// (both YYYY-MM-DD, inclusive). Rejected and cancelled ones do not count: those days can be asked again.
+export function overlappingRequest<T extends OwnRequest>(mine: T[], start: string, lastDay: string): T | undefined {
+  if (!start || !lastDay) return undefined;
+  return mine.find((r) => {
+    if (r.status !== 'pendiente' && r.status !== 'aprobada') return false;
+    const last = r.returnDate > r.start ? dayBefore(r.returnDate) : r.start;
+    return r.start <= lastDay && last >= start;
+  });
+}
+
+function dayBefore(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d - 1));
+  return date.toISOString().slice(0, 10);
+}

@@ -1,0 +1,14 @@
+{
+  "name": "elva-gestion-firestore-tests",
+  "private": true,
+  "description": "Tests for firestore.rules with the Firestore emulator. Needs Java 21+.",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-elva \"node --test rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.4.0",
+    "firebase-tools": "15.37.0"
+  }
+}

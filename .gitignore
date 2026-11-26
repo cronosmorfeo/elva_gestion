@@ -75,9 +75,17 @@ Thumbs.db
 /blob-report/
 /playwright/.cache/
 
-firebase.json
+# firebase.json (Hosting and its security headers) is shared; .firebaserc names each person's project.
 .firebaserc
 
 # Firebase config: each developer keeps their own (copy environment.example.ts)
 /src/environments/environment.ts
 /src/environments/environment.prod.ts
+
+# Firestore rules tests (firestore-tests/)
+firestore-tests/node_modules
+
+# Firebase CLI cache (hosting deploys)
+.firebase/
+# Firestore emulator logs
+firestore-debug.log

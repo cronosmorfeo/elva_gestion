@@ -283,7 +283,9 @@ export class RequestsStore {
       const ownerRef = days && typeof data['uid'] === 'string' ? doc(db, 'colaboradores', data['uid']) : null;
       const owner = ownerRef ? await tx.get(ownerRef) : null;
       const next = ownerRef ? balanceAfterCancel(owner?.data()?.['vacaciones_disponibles'], days) : null;
-      if (ownerRef && next !== null) tx.update(ownerRef, { vacaciones_disponibles: next });
+      // devolucion names the request, so the Firestore rules can check that exactly its days come back.
+      if (ownerRef && next !== null)
+        tx.update(ownerRef, { vacaciones_disponibles: next, devolucion: { solicitud: id } });
       const returnedDays = next === null ? 0 : days;
       tx.update(ref, {
         estado: 'cancelada',

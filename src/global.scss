@@ -109,3 +109,49 @@
   background: #008f82;
   color: #fff;
 }
+
+// Login, Cambiar contraseña and the e-mail link page (they share login.page.scss): "¿Olvidó su contraseña?",
+// "Volver" and the form messages. Here instead of login.page.scss to keep that file under its size budget.
+.login-container {
+  .link-btn {
+    display: block;
+    margin: 1.25rem auto 0;
+    background: none;
+    border: none;
+    color: #ffffff;
+    font: inherit;
+    font-size: 0.95rem;
+    text-decoration: underline;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #5ce1e6;
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  }
+
+  .form-hint {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    opacity: 0.85;
+  }
+
+  .form-message {
+    margin: 1rem 0 0;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .form-error {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
+  }
+}

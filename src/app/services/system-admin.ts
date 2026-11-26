@@ -6,6 +6,7 @@ import { IDLE_DEFAULT_MINUTES } from '../shared/idle';
 
 import type { FeatureFlag } from './feature-flags';
 import { DEFAULT_FLAGS } from './feature-flags';
+import { workerUrl } from './push-relay';
 
 // Configuration documents the page needs, with their default values. Each Firebase project (the company's,
 // each developer's) gets them the first time the jefatura opens the dashboard, or with "Actualizar
@@ -74,6 +75,28 @@ export class SystemAdminService {
       else result.created.push(path);
     }
     return result;
+  }
+
+  // Firebase Authentication settings the code needs (the password policy), set by the Worker with the service
+  // account, since the page cannot change them. Like the seeds, it runs when the jefatura opens the panel, so
+  // every Firebase project gets them. 'unavailable' without a Worker or if it fails (details in the console).
+  async applyAuthSettings(): Promise<'ok' | 'updated' | 'unavailable'> {
+    const url = workerUrl();
+    const user = getAuth().currentUser;
+    if (!url || !user) return 'unavailable';
+    try {
+      const res = await fetch(`${url.replace(/\/+$/, '')}/setup`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${await user.getIdToken()}`, 'content-type': 'application/json' },
+        body: '{}',
+      });
+      if (!res.ok) throw new Error(`Worker answered ${res.status}`);
+      const body = (await res.json()) as { passwordPolicy?: unknown };
+      return body.passwordPolicy === 'updated' ? 'updated' : 'ok';
+    } catch (err) {
+      console.warn('[SystemAdmin] Could not check the password policy:', err);
+      return 'unavailable';
+    }
   }
 
   async setFlag(flag: FeatureFlag, value: boolean): Promise<void> {

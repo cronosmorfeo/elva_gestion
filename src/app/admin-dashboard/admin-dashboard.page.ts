@@ -1066,6 +1066,10 @@ export class AdminDashboardPage {
     destroyRef.onDestroy(() => clearTimeout(timer));
   }
 
+  changePassword(): void {
+    void this.router.navigateByUrl('/tabs/contrasena');
+  }
+
   openSystem(): void {
     if (this.approver() !== 'jefatura') return;
     this.systemMessage.set('');
@@ -1102,12 +1106,15 @@ export class AdminDashboardPage {
     this.systemMessage.set('');
     try {
       const r = await this.system.seed();
+      const policy = await this.system.applyAuthSettings();
       const parts = [
         r.created.length ? `Se creó: ${r.created.join(', ')}.` : '',
         r.completed.length ? `Se completó: ${r.completed.join(', ')}.` : '',
+        policy === 'updated' ? 'Se aplicó la política de contraseñas (mínimo 15 caracteres).' : '',
+        policy === 'unavailable' ? 'No se pudo revisar la política de contraseñas (Worker); revisá la consola.' : '',
       ].filter(Boolean);
       this.systemMessage.set(parts.length ? parts.join(' ') : 'Todo estaba al día. No se cambió nada.');
-      if (parts.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
+      if (r.created.length || r.completed.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
     } catch (err) {
       this.systemError.set(this.systemProblem(err));
     } finally {
@@ -1134,6 +1141,7 @@ export class AdminDashboardPage {
         void this.system
           .seed()
           .catch((err: unknown) => console.error('[Seeds] Could not create the configuration:', err));
+        void this.system.applyAuthSettings();
       }
     } catch {
       this.profileName.set(user.displayName ?? '');

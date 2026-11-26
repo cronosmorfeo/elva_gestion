@@ -1,9 +1,276 @@
 rules_version = '2';
 
+// ELVA Gestión. Roles live in colaboradores/{uid}.tipo_colaborador: 'regular' (worker), 'rh' and
+// 'admin' (the jefatura: Félix and Vanessa). Nothing is allowed unless a rule below says so: any
+// other path, an anonymous session or an account without an active colaboradores document gets nothing.
+// Tests: firestore-tests/ (see docs/security.md).
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ---------- Who is asking ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return get(/databases/$(database)/documents/colaboradores/$(request.auth.uid)).data;
+    }
+
+    // Signed in with an active colaboradores document. A self-registered or anonymous account has none.
+    function active() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/colaboradores/$(request.auth.uid))
+        && me().get('activo', false) == true;
+    }
+
+    function isAdmin() {
+      return active() && me().get('tipo_colaborador', '') == 'admin';
+    }
+
+    function isRh() {
+      return active() && me().get('tipo_colaborador', '') == 'rh';
+    }
+
+    function isPanel() {
+      return isAdmin() || isRh();
+    }
+
+    // ---------- Helpers ----------
+
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // { por, fecha } written by this account right now (fecha: serverTimestamp()).
+    function stamped(m) {
+      return m is map && m.get('por', '') == request.auth.uid && m.get('fecha', null) == request.time;
+    }
+
+    function owns(data) {
+      return data.get('uid', '') == request.auth.uid;
+    }
+
+    // "YYYY-MM-DD" and "HH:mm" in Costa Rica (UTC-6) as a timestamp.
+    function crTime(day, time) {
+      let d = day.split('-');
+      let t = time.split(':');
+      return timestamp.date(int(d[0]), int(d[1]), int(d[2])) + duration.value(int(t[0]) * 60 + int(t[1]) + 360, 'm');
+    }
+
+    // A request with no estado counts as pending (the first ones were saved without it).
+    function isPending() {
+      return resource.data.get('estado', 'pendiente') == 'pendiente';
+    }
+
+    // ---------- Decisions (vacations and overtime): RH reviews, the jefatura decides, either rejects ----------
+
+    function rhApproves() {
+      return isRh() && isPending()
+        && !('aprobacionRh' in resource.data)
+        && changed().hasOnly(['aprobacionRh'])
+        && stamped(request.resource.data.aprobacionRh);
+    }
+
+    function bossApproves() {
+      return isAdmin() && isPending()
+        && !('aprobacionJefatura' in resource.data)
+        && changed().hasOnly(['aprobacionJefatura', 'estado', 'decision'])
+        && request.resource.data.estado == 'aprobada'
+        && stamped(request.resource.data.aprobacionJefatura)
+        && stamped(request.resource.data.decision);
+    }
+
+    function rejects() {
+      let d = request.resource.data.decision;
+      return isPanel() && isPending()
+        && changed().hasOnly(['estado', 'decision'])
+        && request.resource.data.estado == 'rechazada'
+        && stamped(d)
+        && d.get('motivo', '') is string && d.get('motivo', '').size() > 0 && d.get('motivo', '').size() <= 500
+        && ((isAdmin() && d.get('rol', '') == 'jefatura') || (isRh() && d.get('rol', '') == 'rh'));
+    }
+
+    // The owner cancels a pending or approved request that has not started yet. Only an approved one
+    // can give days back, and only the days its approval deducted.
+    function ownerCancels(start) {
+      let c = request.resource.data.cancelacion;
+      return active() && owns(resource.data)
+        && resource.data.get('estado', 'pendiente') in ['pendiente', 'aprobada']
+        && start > request.time
+        && changed().hasOnly(['estado', 'cancelacion'])
+        && request.resource.data.estado == 'cancelada'
+        && stamped(c)
+        && c.get('diasDevueltos', -1) in [0, resource.data.get('decision', {}).get('diasDescontados', 0)];
+    }
+
+    // ---------- Employees ----------
+
+    match /colaboradores/{uid} {
+      // Your own document always (also when inactive, so the page can tell you and sign you out).
+      allow read: if (signedIn() && request.auth.uid == uid) || isPanel();
+
+      // Crear empleado: always a worker, active.
+      allow create: if isPanel()
+        && request.resource.data.get('uid', '') == uid
+        && request.resource.data.get('tipo_colaborador', '') == 'regular'
+        && request.resource.data.get('activo', false) == true;
+
+      // Edit employee and the balance changes of approving. Only the jefatura changes account types or
+      // deactivates an admin; nobody changes their own type, deactivates themselves or raises their own
+      // salary or balance; deactivating is final; the e-mail and uid never change.
+      function panelEdits(target) {
+        let self = request.auth.uid == target;
+        let ch = changed();
+        let targetIsAdmin = resource.data.get('tipo_colaborador', 'regular') == 'admin';
+        return isPanel()
+          && !ch.hasAny(['correo', 'uid', 'createdAt'])
+          && (!ch.hasAny(['tipo_colaborador'])
+              || (isAdmin() && !self && request.resource.data.tipo_colaborador in ['regular', 'rh', 'admin']))
+          && (!ch.hasAny(['activo'])
+              || (!self && resource.data.get('activo', false) == true && request.resource.data.activo == false
+                  && (isAdmin() || !targetIsAdmin)))
+          && (!self || !ch.hasAny(['salario', 'diasAnuales', 'acumulaDesde']))
+          && (!self || !ch.hasAny(['vacaciones_disponibles'])
+              || request.resource.data.vacaciones_disponibles < resource.data.vacaciones_disponibles);
+      }
+
+      // A worker who cancels approved vacations gets back exactly what that request deducted, once:
+      // devolucion.solicitud names the request, which goes from aprobada to cancelada in the same write.
+      function ownerGetsDaysBack(target) {
+        let id = request.resource.data.get('devolucion', {}).get('solicitud', '');
+        let path = /databases/$(database)/documents/vacations_requests/$(id);
+        let before = get(path).data;
+        let after = getAfter(path).data;
+        let days = before.get('decision', {}).get('diasDescontados', 0);
+        return active() && request.auth.uid == target
+          && changed().hasOnly(['vacaciones_disponibles', 'devolucion'])
+          && id is string && id.size() > 0
+          && before.get('uid', '') == target
+          && before.get('estado', '') == 'aprobada'
+          && after.get('estado', '') == 'cancelada'
+          && days > 0
+          && after.get('cancelacion', {}).get('diasDevueltos', -1) == days
+          && request.resource.data.vacaciones_disponibles == resource.data.vacaciones_disponibles + days;
+      }
+
+      allow update: if panelEdits(uid) || ownerGetsDaysBack(uid);
+      allow delete: if false;
+
+      // Payment account: the owner and the panel read it; the panel writes it, never on their own account.
+      match /privado/{docId} {
+        allow read: if docId == 'pago' && ((active() && request.auth.uid == uid) || isPanel());
+        allow write: if docId == 'pago' && isPanel() && request.auth.uid != uid
+          && request.resource.data.get('iban', '') is string
+          && (request.resource.data.get('iban', '') == '' || request.resource.data.get('iban', '').matches('^CR[0-9]{20}$'))
+          && request.resource.data.get('updatedBy', '') == request.auth.uid;
+      }
+    }
+
+    // ---------- Requests ----------
+
+    match /vacations_requests/{id} {
+      allow read: if isPanel() || (active() && owns(resource.data));
+
+      allow create: if active() && owns(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'nombreSolicitante', 'correoSolicitante', 'diaInicio', 'diaFin', 'diasSolicitados',
+          'comentarioRRHH', 'fechaSolicitud', 'medioDiaDesde', 'estado'])
+        && request.resource.data.get('estado', 'pendiente') == 'pendiente'
+        && request.resource.data.diaInicio is string
+        && request.resource.data.diaInicio.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.diaFin is string
+        && request.resource.data.diaFin.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.diasSolicitados is number
+        && request.resource.data.diasSolicitados > 0
+        && request.resource.data.diasSolicitados <= 366
+        && request.resource.data.fechaSolicitud == request.time;
+
+      allow update: if rhApproves()
+        || (bossApproves()
+            && request.resource.data.decision.get('diasDescontados', -1) is number
+            && request.resource.data.decision.get('diasDescontados', -1) >= 0)
+        || rejects()
+        || ownerCancels(crTime(resource.data.diaInicio, '00:00'));
+
+      allow delete: if false;
+    }
+
+    match /overtime_requests/{id} {
+      allow read: if isPanel() || (active() && owns(resource.data));
+
+      allow create: if active() && owns(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'nombreSolicitante', 'correoSolicitante', 'inicio', 'fin', 'tarea', 'estado', 'fechaSolicitud'])
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.inicio is string
+        && request.resource.data.inicio.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$')
+        && request.resource.data.fin is string
+        && request.resource.data.fin.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$')
+        && request.resource.data.tarea is string
+        && request.resource.data.tarea.size() > 0
+        && request.resource.data.fechaSolicitud == request.time;
+
+      allow update: if rhApproves() || bossApproves() || rejects()
+        || ownerCancels(crTime(resource.data.inicio.split('T')[0], resource.data.inicio.split('T')[1]));
+
+      allow delete: if false;
+    }
+
+    // ---------- Other collections ----------
+
+    match /bank_change_requests/{id} {
+      allow read: if isPanel() || (active() && owns(resource.data));
+      allow create: if active() && owns(request.resource.data)
+        && request.resource.data.keys().hasOnly(['uid', 'nombre', 'nota', 'estado', 'fecha'])
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.get('nota', '') is string
+        && request.resource.data.get('nota', '').size() <= 200
+        && request.resource.data.fecha == request.time;
+      allow update: if isPanel()
+        && resource.data.get('estado', '') == 'pendiente'
+        && changed().hasOnly(['estado', 'atendida'])
+        && request.resource.data.estado == 'atendida'
+        && stamped(request.resource.data.atendida);
+      allow delete: if false;
+    }
+
+    match /notices/{id} {
+      allow read: if active();
+      allow create: if isPanel() && request.resource.data.get('autorUid', '') == request.auth.uid;
+      allow update: if isPanel() && !changed().hasAny(['autorUid', 'createdAt']);
+      allow delete: if isPanel();
+    }
+
+    match /weekly_reports/{id} {
+      allow read: if isPanel() || (active() && owns(resource.data));
+      allow create: if active() && owns(request.resource.data)
+        && request.resource.data.keys().hasOnly(['uid', 'nombre', 'semana', 'texto', 'archivos', 'visto', 'fechaEnvio'])
+        && request.resource.data.visto == null
+        && request.resource.data.fechaEnvio == request.time;
+      allow update: if isPanel() && changed().hasOnly(['visto']) && stamped(request.resource.data.visto);
+      allow delete: if false;
+    }
+
+    // Push notification tokens: each person only their own (Cloud Functions read them with admin access).
+    // Saving one needs an active colaborador, so a self-registered account cannot fill this up. Removing one
+    // only needs your own session, so signing out never fails (also right after being deactivated).
+    match /users/{uid}/fcmTokens/{token} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if active() && request.auth.uid == uid;
+    }
+
+    // Feature flags and settings: everyone active reads them; only the jefatura writes them
+    // (Administrar sistema and the seeds), and only with valid values.
+    match /config/{docId} {
+      allow read: if active();
+      allow write: if isAdmin() && (
+        (docId == 'featureFlags' && request.resource.data.values().hasOnly([true, false]))
+        || (docId == 'seguridad'
+          && request.resource.data.keys().hasOnly(['minutosInactividad'])
+          && request.resource.data.minutosInactividad is int
+          && request.resource.data.minutosInactividad >= 5
+          && request.resource.data.minutosInactividad <= 240));
     }
   }
 }

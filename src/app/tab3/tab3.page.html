@@ -413,20 +413,9 @@
             </ion-input>
           </div>
 
-          <!-- Password -->
-          <div class="form-field full-width">
-            <ion-label>Contraseña *</ion-label>
-
-            <ion-input
-              name="password"
-              type="password"
-              placeholder="Mínimo 6 caracteres"
-              fill="outline"
-              [(ngModel)]="colaborador.password"
-              minlength="6"
-              required>
-            </ion-input>
-          </div>
+          <p class="form-required-note full-width">
+            La persona va a recibir en ese correo un enlace para crear su propia contraseña. Nadie más la conoce.
+          </p>
 
         </div>
 
@@ -477,10 +466,10 @@
         <div class="success-icon" aria-hidden="true">✓</div>
         <h2 id="creado-titulo">Usuario creado correctamente</h2>
         <p>
-          <strong>{{ creado.nombre }}</strong> ya puede iniciar sesión con
-          <strong>{{ creado.correo }}</strong>.
+          Le enviamos a <strong>{{ creado.correo }}</strong> un enlace para que
+          <strong>{{ creado.nombre }}</strong> cree su contraseña.
         </p>
-        <p class="success-tip">Entregale la contraseña en privado.</p>
+        <p class="success-tip">Si no le llega, que revise spam o use "¿Olvidó su contraseña?" en la entrada.</p>
         <div class="success-actions">
           <ion-button fill="clear" color="medium" (click)="crearOtro()">Crear otro usuario</ion-button>
           <ion-button id="creado-aceptar" class="create-button" (click)="irAlPanel()">Aceptar</ion-button>

@@ -22,7 +22,7 @@ export class AuthService {
 
       if (!docSnap.exists()) {
         await signOut(this.auth);
-        return { success: false, error: 'El usuario está autenticado, pero no existe su registro en colaboradores.' };
+        return { success: false, error: 'No se pudo iniciar sesión. Comunícate con RH.' };
       }
 
       const data = docSnap.data();
@@ -42,12 +42,9 @@ export class AuthService {
     } catch (error: any) {
       console.error('Error de autenticación:', error);
       
+      // Same message whether the e-mail exists or not, so nobody can find out which accounts exist.
       let errorMessage = 'Correo o contraseña incorrectos.';
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-        errorMessage = 'Credenciales inválidas. Verifica tus datos.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Contraseña incorrecta.';
-      } else if (error.code === 'auth/invalid-email') {
+      if (error.code === 'auth/invalid-email') {
         errorMessage = 'El formato del correo electrónico no es válido.';
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = 'Demasiados intentos fallidos. Intenta más tarde.';

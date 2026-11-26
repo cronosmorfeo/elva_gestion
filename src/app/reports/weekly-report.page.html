@@ -29,10 +29,8 @@
 
       <div class="files">
         <label class="file-btn" for="report-files">Adjuntar archivos</label>
-        <input id="report-files" class="sr-only" type="file" multiple (change)="addFiles($event)" />
-        <span class="hint"
-          >PDF, capturas, documentos o cualquier archivo. Hasta {{ maxFiles }}, de 10 MB cada uno.</span
-        >
+        <input id="report-files" class="sr-only" type="file" multiple [accept]="accept" (change)="addFiles($event)" />
+        <span class="hint">PDF, Word, Excel, CSV, TXT o imágenes. Hasta {{ maxFiles }}, de 10 MB cada uno.</span>
 
         @if (fileRows().length) {
         <ul class="file-list">
@@ -52,9 +50,12 @@
 
       @if (visibleProblem()) {
       <p class="error" role="alert">{{ visibleProblem() }}</p>
+      } @if (uploading()) {
+      <p class="hint" role="status">{{ uploading() }}</p>
       }
-
-      <ion-button expand="block" type="submit" class="submit-btn" [disabled]="!!problem()"> Enviar reporte </ion-button>
+      <ion-button expand="block" type="submit" class="submit-btn" [disabled]="!!problem() || sending()">
+        Enviar reporte
+      </ion-button>
     </form>
 
     <section class="sent" aria-labelledby="sent-title">
@@ -68,9 +69,11 @@
           </div>
           @if (r.text) {
           <p>{{ r.text }}</p>
-          } @for (a of r.attachments; track a) {
-          <span class="attachment">{{ a }}</span>
-          }
+          } @for (a of r.attachments; track $index) { @if (a.path) {
+          <button type="button" class="attachment link" (click)="openFile(a.path)">{{ a.label }} · Descargar</button>
+          } @else {
+          <span class="attachment">{{ a.label }}</span>
+          } }
         </li>
         }
       </ul>

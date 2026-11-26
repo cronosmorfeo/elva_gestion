@@ -1,5 +1,5 @@
 import { costaRicaHolidays, easterSunday, holidaysBetween } from './holidays';
-import { MAX_REQUEST_DAYS, countDeductedDays, listVacationDays } from './vacation-days';
+import { MAX_REQUEST_DAYS, countDeductedDays, listVacationDays, overlappingRequest } from './vacation-days';
 
 const days = (start: string, end: string) => listVacationDays(start, end, holidaysBetween(start, end));
 const count = (start: string, end: string) => countDeductedDays(days(start, end));
@@ -81,5 +81,28 @@ describe('vacation days', () => {
     const list = days('2026-10-30', '2026-11-02');
     expect(list.map((d) => d.date)).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
     expect(list.map((d) => d.weekday)).toEqual([5, 6, 0, 1]);
+  });
+});
+
+describe('overlappingRequest', () => {
+  const mine = [
+    { start: '2026-12-01', returnDate: '2026-12-05', status: 'aprobada' }, // 1 to 4 Dec
+    { start: '2026-12-14', returnDate: '2026-12-14', status: 'pendiente' }, // half day on the 14th
+    { start: '2026-12-21', returnDate: '2026-12-24', status: 'rechazada' },
+    { start: '2026-12-28', returnDate: '2026-12-30', status: 'cancelada' },
+  ];
+
+  it('finds a pending or approved request with a day in common', () => {
+    expect(overlappingRequest(mine, '2026-12-01', '2026-12-04')).toBe(mine[0]); // the same days again
+    expect(overlappingRequest(mine, '2026-12-04', '2026-12-08')).toBe(mine[0]); // one day in common
+    expect(overlappingRequest(mine, '2026-11-30', '2026-12-01')).toBe(mine[0]);
+    expect(overlappingRequest(mine, '2026-12-14', '2026-12-14')).toBe(mine[1]); // half day
+  });
+
+  it('allows the day of return and the days of rejected or cancelled requests', () => {
+    expect(overlappingRequest(mine, '2026-12-05', '2026-12-05')).toBeUndefined(); // back at work that day
+    expect(overlappingRequest(mine, '2026-12-21', '2026-12-23')).toBeUndefined();
+    expect(overlappingRequest(mine, '2026-12-28', '2026-12-29')).toBeUndefined();
+    expect(overlappingRequest(mine, '', '')).toBeUndefined();
   });
 });

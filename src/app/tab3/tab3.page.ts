@@ -45,6 +45,8 @@ import {
 
 import { localIsoDate } from '../admin-dashboard/admin-dates';
 import { bankProblem } from '../services/bank-account';
+import { randomPassword, sendPasswordLink } from '../services/password';
+import { reportChange } from '../services/push-relay';
 import { RequestsStore } from '../services/requests-store';
 import { DEFAULT_DAYS_PER_YEAR } from '../services/vacation-balance';
 import { parseDays } from '../shared/day-count';
@@ -72,7 +74,6 @@ interface Colaborador {
   jornada: string;
   horarioLaborado: string;
   correo: string;
-  password: string;
 }
 
 @Component({
@@ -107,8 +108,7 @@ export class Tab3Page {
     fechaIngreso: '',
     jornada: '',
     horarioLaborado: '',
-    correo: '',
-    password: ''
+    correo: ''
   };
 
   guardando = false;
@@ -234,15 +234,9 @@ export class Tab3Page {
       !this.colaborador.fechaIngreso ||
       !this.colaborador.jornada ||
       !this.colaborador.horarioLaborado.trim() ||
-      !this.colaborador.correo.trim() ||
-      !this.colaborador.password
+      !this.colaborador.correo.trim()
     ) {
       alert('Por favor, completa todos los campos.');
-      return;
-    }
-
-    if (this.colaborador.password.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
 
@@ -282,12 +276,13 @@ export class Tab3Page {
 
       const secondaryAuth = getAuth(secondaryApp);
 
-      // Crear usuario directamente en Firebase Authentication.
+      // Crear usuario directamente en Firebase Authentication, con una contraseña al azar que nadie ve:
+      // la persona elige la suya desde el enlace que le llega al correo (más abajo).
 
       const credential = await createUserWithEmailAndPassword(
         secondaryAuth,
         this.colaborador.correo.trim().toLowerCase(),
-        this.colaborador.password
+        randomPassword()
       );
 
       const user = credential.user;
@@ -334,12 +329,23 @@ export class Tab3Page {
             cedula: this.pago.cedula,
             iban: this.pago.iban,
             currency: this.pago.monedaCuenta
-          });
+          }, false);
         } catch (errorPago) {
           console.error('Error guardando la cuenta de pago:', errorPago);
           alert('El usuario se creó, pero no se pudo guardar la cuenta de pago. Agregala desde Editar empleado.');
         }
       }
+
+      // The person chooses their own password from Firebase's e-mail link, so nobody else ever knows it.
+      try {
+        await sendPasswordLink(user.email ?? this.colaborador.correo);
+      } catch (errorEnlace) {
+        console.error('Error enviando el enlace de contraseña:', errorEnlace);
+        alert('El usuario se creó, pero no se pudo enviar el correo para crear la contraseña. Pídale que use "¿Olvidó su contraseña?" en la entrada.');
+      }
+
+      // Welcome e-mail (Resend), instead of "your payment account changed".
+      reportChange('colaboradores', user.uid);
 
       this.limpiarFormulario();
 
@@ -384,8 +390,7 @@ export class Tab3Page {
       fechaIngreso: '',
       jornada: '',
       horarioLaborado: '',
-      correo: '',
-      password: ''
+      correo: ''
     };
     this.salarioTexto = '';
     this.horaInicio = '';

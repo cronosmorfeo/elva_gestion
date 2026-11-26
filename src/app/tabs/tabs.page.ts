@@ -15,7 +15,7 @@ import { NotificationsService, notifyMessage } from '../services/notifications';
 import { RequestsStore } from '../services/requests-store';
 
 // Pages that have their own header, so the navbar stays hidden there.
-const OWN_HEADER = ['/tabs/login', '/tabs/dashboard', '/tabs/tab3'];
+const OWN_HEADER = ['/tabs/login', '/tabs/dashboard', '/tabs/tab3', '/tabs/contrasena', '/tabs/restablecer'];
 
 @Component({
   selector: 'app-tabs',

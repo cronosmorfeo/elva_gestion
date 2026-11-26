@@ -12,6 +12,7 @@ import { bankProblem, updatedText } from '../services/bank-account';
 import type { FeatureFlag } from '../services/feature-flags';
 import { FeatureFlagsService } from '../services/feature-flags';
 import { NotificationsService, notifyMessage } from '../services/notifications';
+import { openReportFile } from '../services/report-files';
 import { RequestsStore } from '../services/requests-store';
 import { FLAG_LABELS, NotJefaturaError, SystemAdminService } from '../services/system-admin';
 import type { ApproveResult } from '../services/vacation-balance';
@@ -252,7 +253,12 @@ export class AdminDashboardPage {
         ...r,
         week: weekLabel(r.weekStart),
         sent: `${formatShortDate(r.sentAt.slice(0, 10))}, ${formatTime(r.sentAt)}`,
-        attachments: r.files.map((f) => ({ name: f.name, kind: fileKind(f), size: formatFileSize(f.size) })),
+        attachments: r.files.map((f) => ({
+          name: f.name,
+          kind: fileKind(f),
+          size: formatFileSize(f.size),
+          path: f.path ?? '',
+        })),
       }));
     return { employee, items, unseen: items.filter((r) => !r.seen).length };
   });
@@ -721,6 +727,20 @@ export class AdminDashboardPage {
     if (id) setTimeout(() => document.getElementById(`reports-${id}`)?.focus());
   }
 
+  async openFile(path: string): Promise<void> {
+    try {
+      await openReportFile(path);
+    } catch (err) {
+      console.error('[AdminDashboard] Could not open the file:', err);
+      const toast = await this.toast.create({
+        message: 'No se pudo abrir el archivo. Probá de nuevo.',
+        duration: 4000,
+        position: 'bottom',
+      });
+      await toast.present();
+    }
+  }
+
   // Admins can only mark a report as seen. Questions go to the person by Slack.
   async markSeen(reportId: string): Promise<void> {
     const report = this.reports().find((r) => r.id === reportId);
@@ -911,7 +931,7 @@ export class AdminDashboardPage {
       ...(f.canChangeRole ? { tipo_colaborador: f.tipo } : {}),
       pais: f.pais,
       fechaIngreso: f.fechaIngreso,
-      salario: f.salario,
+      salario: f.self ? before.salario : f.salario,
       moneda: f.moneda,
       jornada: f.jornada,
       horarioLaborado: horario,
@@ -919,7 +939,9 @@ export class AdminDashboardPage {
       ...(before.activo && !activo ? { desactivadoEl: localIsoDate(new Date()) } : {}),
       // The balance is only saved when it changed, so it never undoes an approval made meanwhile,
       // and employees without a balance stay that way. Earning starts the first time it is saved.
-      ...(f.vacaciones !== '' &&
+      // Never on your own account: another admin changes your balance (the Firestore rules require it too).
+      ...(!f.self &&
+      f.vacaciones !== '' &&
       (f.vacaciones !== before.vacaciones || f.diasAnuales !== before.diasAnuales || !employee?.accrualFrom)
         ? {
             ...storedBalance(
@@ -1044,6 +1066,10 @@ export class AdminDashboardPage {
     destroyRef.onDestroy(() => clearTimeout(timer));
   }
 
+  changePassword(): void {
+    void this.router.navigateByUrl('/tabs/contrasena');
+  }
+
   openSystem(): void {
     if (this.approver() !== 'jefatura') return;
     this.systemMessage.set('');
@@ -1080,12 +1106,15 @@ export class AdminDashboardPage {
     this.systemMessage.set('');
     try {
       const r = await this.system.seed();
+      const policy = await this.system.applyAuthSettings();
       const parts = [
         r.created.length ? `Se creó: ${r.created.join(', ')}.` : '',
         r.completed.length ? `Se completó: ${r.completed.join(', ')}.` : '',
+        policy === 'updated' ? 'Se aplicó la política de contraseñas (mínimo 15 caracteres).' : '',
+        policy === 'unavailable' ? 'No se pudo revisar la política de contraseñas (Worker); revisá la consola.' : '',
       ].filter(Boolean);
       this.systemMessage.set(parts.length ? parts.join(' ') : 'Todo estaba al día. No se cambió nada.');
-      if (parts.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
+      if (r.created.length || r.completed.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
     } catch (err) {
       this.systemError.set(this.systemProblem(err));
     } finally {
@@ -1112,6 +1141,7 @@ export class AdminDashboardPage {
         void this.system
           .seed()
           .catch((err: unknown) => console.error('[Seeds] Could not create the configuration:', err));
+        void this.system.applyAuthSettings();
       }
     } catch {
       this.profileName.set(user.displayName ?? '');

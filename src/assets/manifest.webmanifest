@@ -1,0 +1,15 @@
+{
+  "name": "ELVA Gestión",
+  "short_name": "ELVA Gestión",
+  "description": "Recursos Humanos de ELVA IA: vacaciones, horas extra y solicitudes.",
+  "lang": "es-CR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#008f82",
+  "theme_color": "#008f82",
+  "icons": [
+    { "src": "/assets/icon/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,28 @@
+# ELVA Gestión push Worker. Setup and deploy: README.md.
+name = "elva-gestion-push"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+# Only the main address (https://elva-gestion-push.<subdomain>.workers.dev); no extra preview addresses per version.
+workers_dev = true
+preview_urls = false
+
+[vars]
+# Each person sets their own Firebase project and the addresses their page runs on.
+FIREBASE_PROJECT_ID = "elva-gestion"
+ALLOWED_ORIGINS = "https://elva-gestion.web.app,https://elva-gestion.firebaseapp.com,http://localhost:4200,http://[::1]:4200,http://localhost:4201"
+
+# Backblaze B2 (report attachments): the S3 endpoint and the private bucket.
+B2_ENDPOINT = "s3.us-east-005.backblazeb2.com"
+B2_BUCKET = "elva-gestion-pruebas"
+
+# E-mails with Resend (sent with the push). For tests, Resend's own sender, which only delivers to the
+# e-mail of the Resend account; once the company domain is verified: "ELVA Gestión <noreply@elvaai.com>".
+MAIL_FROM = "ELVA Gestión <onboarding@resend.dev>"
+# The page, for the "Abrir ELVA Gestión" button in the e-mails.
+APP_URL = "https://elva-gestion.web.app"
+
+# Secrets, never written here:
+#   npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
+#   npx wrangler secret put B2_KEY_ID
+#   npx wrangler secret put B2_APPLICATION_KEY
+#   npx wrangler secret put RESEND_API_KEY   (without it, no e-mails; push works the same)

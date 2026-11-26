@@ -1,6 +1,8 @@
 import { Injectable, Injector, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { playChime, unlockChimeOnFirstGesture } from '../shared/chime';
+
 import type { BrowserNotice } from './notification-events';
 import { PushNotificationService } from './push-notification.service';
 
@@ -32,6 +34,7 @@ export class NotificationsService {
   readonly cards = signal<NotificationCard[]>([]);
 
   constructor() {
+    unlockChimeOnFirstGesture();
     // A click on a system notification reuses the open tab: the service worker asks it to go to the page.
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
     navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
@@ -71,13 +74,18 @@ export class NotificationsService {
     // The card needs no permission: it is part of the page.
     if (document.visibilityState === 'visible') {
       this.addCard(notice);
+      playChime();
       return;
     }
     if (!supported() || Notification.permission !== 'granted') return;
+    // Our chime also plays with the tab in the background; then the system notification stays silent so
+    // only one sound is heard. If the browser does not allow sound yet, the system sound plays instead.
+    const chimed = playChime();
     // Image and buttons only work through the service worker, which also opens the right page on click.
     const options: NotificationOptions & { image: string; actions: { action: string; title: string }[] } = {
       body: notice.body,
       tag: notice.tag,
+      silent: chimed,
       icon: '/assets/icon/favicon.png',
       image: BANNER,
       actions: [{ action: 'open', title: actionLabel(notice.url) }],
@@ -89,7 +97,12 @@ export class NotificationsService {
         await registration.showNotification(notice.title, options);
         return;
       }
-      const shown = new Notification(notice.title, { body: notice.body, tag: notice.tag, icon: options.icon });
+      const shown = new Notification(notice.title, {
+        body: notice.body,
+        tag: notice.tag,
+        icon: options.icon,
+        silent: options.silent,
+      });
       shown.onclick = () => {
         window.focus();
         window.location.assign(notice.url);

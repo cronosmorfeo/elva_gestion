@@ -47,6 +47,10 @@ describe('report utils', () => {
         Array.from({ length: 6 }, () => file(10)),
       ),
     ).toContain('5 archivos');
+    expect(reportProblem('', [{ name: 'virus.exe', size: 10, type: '' }])).toContain('no se puede adjuntar');
+    expect(reportProblem('', [{ name: 'pagina.HTML', size: 10, type: 'text/html' }])).toContain('no se puede adjuntar');
+    expect(reportProblem('', [{ name: 'Planilla.XLSX', size: 10, type: '' }])).toBe('');
+    expect(reportProblem('', [{ name: 'vacio.pdf', size: 0, type: 'application/pdf' }])).toContain('vacío');
   });
 
   it('counts unseen reports per employee', () => {

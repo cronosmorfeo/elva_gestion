@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { IonContent, ToastController } from '@ionic/angular';
 
 import { formatShortDate, formatTime, localIsoDate } from '../admin-dashboard/admin-dates';
@@ -14,7 +15,7 @@ import { longDay, seniority } from './profile-utils';
 @Component({
   selector: 'app-profile',
   templateUrl: 'profile.page.html',
-  imports: [IonContent],
+  imports: [IonContent, RouterLink],
 })
 export class ProfilePage {
   private readonly store = inject(RequestsStore);

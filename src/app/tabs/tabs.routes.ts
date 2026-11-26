@@ -16,10 +16,6 @@ export const routes: Routes = [
         loadComponent: () => import('../login/login.page').then((m) => m.LoginPage),
       },
       {
-        path: 'tab2',
-        loadComponent: () => import('../tab2/tab2.page').then((m) => m.Tab2Page),
-      },
-      {
         path: 'tab3',
         canActivate: [adminGuard],
         loadComponent: () => import('../tab3/tab3.page').then((m) => m.Tab3Page),
@@ -33,6 +29,17 @@ export const routes: Routes = [
         path: 'perfil',
         canActivate: [authGuard],
         loadComponent: () => import('../profile/profile.page').then((m) => m.ProfilePage),
+      },
+      {
+        // Firebase's e-mail link (new account or "¿Olvidó su contraseña?") opens here; no session needed.
+        path: 'restablecer',
+        loadComponent: () => import('../password/reset-password.page').then((m) => m.ResetPasswordPage),
+      },
+      {
+        // Change your own password (the current one is asked again).
+        path: 'contrasena',
+        canActivate: [authGuard],
+        loadComponent: () => import('../password/password.page').then((m) => m.PasswordPage),
       },
       {
         path: 'vacaciones',

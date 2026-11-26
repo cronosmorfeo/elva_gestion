@@ -51,6 +51,7 @@ import {
 import type { BrowserNotice, LastSeen } from './notification-events';
 import { lastSeen, noticeEvents, overtimeEvents, vacationEvents } from './notification-events';
 import { NotificationsService } from './notifications';
+import { reportChange } from './push-relay';
 import type { ApproveResult, CancelResult } from './vacation-balance';
 import {
   ApproveError,
@@ -201,7 +202,7 @@ export class RequestsStore {
 
   async addOvertime(request: { start: string; end: string; task: string }): Promise<void> {
     const owner = await this.signedInWorker();
-    await addDoc(collection(getFirestore(), COLLECTIONS.overtime), {
+    const created = await addDoc(collection(getFirestore(), COLLECTIONS.overtime), {
       uid: owner.uid,
       nombreSolicitante: owner.name,
       correoSolicitante: owner.email ?? '',
@@ -211,16 +212,19 @@ export class RequestsStore {
       estado: 'pendiente',
       fechaSolicitud: serverTimestamp(),
     });
+    reportChange(COLLECTIONS.overtime, created.id);
   }
 
   // Rejects with a reason the worker will read. In a transaction, so a request the worker just
   // cancelled, or another admin just decided, is not overwritten.
   // `as` says which side rejects it (RH or the jefatura); either one is enough.
-  rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string, as: Approver): Promise<void> {
-    return this.decidePending(kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id, {
+  async rejectRequest(kind: 'vacaciones' | 'horas', id: string, reason: string, as: Approver): Promise<void> {
+    const name = kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime;
+    await this.decidePending(name, id, {
       estado: 'rechazada',
       decision: { por: this.uid, fecha: serverTimestamp(), motivo: reason.trim(), rol: as },
     });
+    reportChange(name, id);
   }
 
   // RH's approval is a check before the jefatura: it is saved and the request stays pending.
@@ -230,7 +234,7 @@ export class RequestsStore {
   async approveVacation(id: string, ownerUid: string | undefined, days: number, as: Approver): Promise<ApproveResult> {
     const db = getFirestore();
     const requestRef = doc(db, COLLECTIONS.vacations, id);
-    return runTransaction(db, async (tx) => {
+    const result = await runTransaction(db, async (tx): Promise<ApproveResult> => {
       const request = await tx.get(requestRef);
       if (!request.exists()) throw new ApproveError('no-existe');
       const data = request.data();
@@ -261,6 +265,9 @@ export class RequestsStore {
       });
       return check.kind === 'descontar' ? { kind: 'descontado', next: check.next } : { kind: 'sin-saldo' };
     });
+    // RH's review tells the jefatura; the final approval tells the worker.
+    reportChange(COLLECTIONS.vacations, id);
+    return result;
   }
 
   // The worker cancels a pending or approved request that has not started. It stays saved, marked as
@@ -270,7 +277,7 @@ export class RequestsStore {
     const db = getFirestore();
     const ref = doc(db, kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id);
     const now = localDateTime(new Date());
-    return runTransaction(db, async (tx): Promise<CancelResult> => {
+    const result = await runTransaction(db, async (tx): Promise<CancelResult> => {
       const snap = await tx.get(ref);
       if (!snap.exists()) return { kind: 'ya-decidida' };
       const data = snap.data();
@@ -283,7 +290,9 @@ export class RequestsStore {
       const ownerRef = days && typeof data['uid'] === 'string' ? doc(db, 'colaboradores', data['uid']) : null;
       const owner = ownerRef ? await tx.get(ownerRef) : null;
       const next = ownerRef ? balanceAfterCancel(owner?.data()?.['vacaciones_disponibles'], days) : null;
-      if (ownerRef && next !== null) tx.update(ownerRef, { vacaciones_disponibles: next });
+      // devolucion names the request, so the Firestore rules can check that exactly its days come back.
+      if (ownerRef && next !== null)
+        tx.update(ownerRef, { vacaciones_disponibles: next, devolucion: { solicitud: id } });
       const returnedDays = next === null ? 0 : days;
       tx.update(ref, {
         estado: 'cancelada',
@@ -296,18 +305,22 @@ export class RequestsStore {
       });
       return { kind: 'cancelada', returnedDays, wasApproved };
     });
+    if (result.kind === 'cancelada')
+      reportChange(kind === 'vacaciones' ? COLLECTIONS.vacations : COLLECTIONS.overtime, id);
+    return result;
   }
 
   // The worker asks RH to change their payment account. The new account is agreed by Slack.
   async requestBankChange(note: string): Promise<void> {
     const owner = await this.signedInWorker();
-    await addDoc(collection(getFirestore(), BANK_REQUESTS), {
+    const created = await addDoc(collection(getFirestore(), BANK_REQUESTS), {
       uid: owner.uid,
       nombre: owner.name,
       nota: note.trim(),
       estado: 'pendiente',
       fecha: serverTimestamp(),
     });
+    reportChange(BANK_REQUESTS, created.id);
   }
 
   async resolveBankRequest(id: string): Promise<void> {
@@ -323,7 +336,13 @@ export class RequestsStore {
     return toBankAccount((await getDoc(doc(getFirestore(), col, ...rest))).data());
   }
 
-  async saveBankAccount(uid: string, account: { cedula: string; iban: string; currency: string }): Promise<void> {
+  // `notify: false` when the account is new (Crear empleado): the person gets a welcome e-mail instead of
+  // "your payment account changed".
+  async saveBankAccount(
+    uid: string,
+    account: { cedula: string; iban: string; currency: string },
+    notify = true,
+  ): Promise<void> {
     // Nobody changes the account they get paid to; another admin does it.
     if (uid === this.uid) throw new Error('An admin cannot change their own payment account.');
     const [col, ...rest] = bankDocPath(uid);
@@ -334,6 +353,7 @@ export class RequestsStore {
       updatedAt: serverTimestamp(),
       updatedBy: this.uid,
     });
+    if (notify) reportChange('pago', uid);
   }
 
   // Same flow as vacations, without a balance: RH's approval is saved and the request stays pending;
@@ -342,7 +362,7 @@ export class RequestsStore {
   async approveOvertime(id: string, as: Approver): Promise<'parcial' | 'aprobada'> {
     const db = getFirestore();
     const ref = doc(db, COLLECTIONS.overtime, id);
-    return runTransaction(db, async (tx) => {
+    const result = await runTransaction(db, async (tx): Promise<'parcial' | 'aprobada'> => {
       const snap = await tx.get(ref);
       if (!snap.exists()) throw new ApproveError('no-existe');
       const data = snap.data();
@@ -359,6 +379,8 @@ export class RequestsStore {
       tx.update(ref, { [field]: approval, estado: 'aprobada', decision: { por: this.uid, fecha: serverTimestamp() } });
       return 'aprobada';
     });
+    reportChange(COLLECTIONS.overtime, id);
+    return result;
   }
 
   async saveNotice(input: NoticeInput, author: string, id?: string): Promise<void> {
@@ -368,13 +390,14 @@ export class RequestsStore {
       await updateDoc(doc(db, COLLECTIONS.notices, id), { ...clean, updatedAt: serverTimestamp() });
       return;
     }
-    await addDoc(collection(db, COLLECTIONS.notices), {
+    const created = await addDoc(collection(db, COLLECTIONS.notices), {
       ...clean,
       autor: author,
       autorUid: this.uid,
       createdAt: serverTimestamp(),
       updatedAt: null,
     });
+    reportChange(COLLECTIONS.notices, created.id);
   }
 
   async deleteNotice(id: string): Promise<void> {
@@ -388,7 +411,7 @@ export class RequestsStore {
     if (this.uid) writeSeen(this.uid, now);
   }
 
-  // Files are not uploaded yet (Storage needs the Blaze plan): only their name, size and type are saved.
+  // The files are already in Backblaze B2 (services/report-files.ts); this saves their name, size, type and path.
   async sendReport(report: { week: string; text: string; files: ReportFile[] }): Promise<void> {
     const owner = await this.signedInWorker();
     await addDoc(collection(getFirestore(), COLLECTIONS.reports), {
@@ -396,7 +419,12 @@ export class RequestsStore {
       nombre: owner.name,
       semana: report.week,
       texto: report.text.trim(),
-      archivos: report.files.map((f) => ({ nombre: f.name, tamano: f.size, tipo: f.type })),
+      archivos: report.files.map((f) => ({
+        nombre: f.name,
+        tamano: f.size,
+        tipo: f.type,
+        ...(f.path ? { ruta: f.path } : {}),
+      })),
       visto: null,
       fechaEnvio: serverTimestamp(),
     });

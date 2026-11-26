@@ -4,6 +4,7 @@ export interface ReportFile {
   name: string;
   size: number; // bytes
   type: string; // MIME type, may be empty
+  path?: string; // where it is in Backblaze B2 (reports/{uid}/...); missing in reports sent before uploads existed
 }
 
 export interface WorkReport {
@@ -19,6 +20,9 @@ export interface WorkReport {
 
 export const MAX_FILES = 5;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+// Same list as the push Worker (worker/src/files.ts), which is the one that really decides.
+export const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'jfif'];
+export const FILE_ACCEPT = ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(',');
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const pad = (n: number): string => String(n).padStart(2, '0');
@@ -70,6 +74,10 @@ export function reportProblem(text: string, files: ReportFile[]): string {
   if (files.length > MAX_FILES) return `Podés adjuntar hasta ${MAX_FILES} archivos.`;
   const big = files.find((f) => f.size > MAX_FILE_BYTES);
   if (big) return `"${big.name}" pesa más de 10 MB.`;
+  const other = files.find((f) => !ALLOWED_EXTENSIONS.includes(f.name.split('.').pop()?.toLowerCase() ?? ''));
+  if (other) return `"${other.name}" no se puede adjuntar. Se aceptan PDF, Word, Excel, CSV, TXT, PNG y JPG.`;
+  const empty = files.find((f) => f.size === 0);
+  if (empty) return `"${empty.name}" está vacío.`;
   return '';
 }
 

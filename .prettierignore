@@ -3,3 +3,6 @@
 # Gradle's build output.
 android/
 ios/
+
+# Kept on one line: Windows PowerShell breaks multi-line JSON when passing it to the b2 CLI.
+worker/b2-cors-rules.json

@@ -1,0 +1,1 @@
+[{"corsRuleName":"elva-gestion-uploads","allowedOrigins":["https://elva-gestion.web.app","https://elva-gestion.firebaseapp.com","http://localhost:4200","http://localhost:4201"],"allowedOperations":["s3_put","s3_get","s3_head"],"allowedHeaders":["content-type"],"exposeHeaders":["etag"],"maxAgeSeconds":3600}]

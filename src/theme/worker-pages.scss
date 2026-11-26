@@ -383,6 +383,19 @@ $red-soft: #fdecea;
     color: $muted;
   }
 
+  // An attachment that can be downloaded.
+  button.attachment.link {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ion-color-primary, #008f82);
+    font-weight: 600;
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
   .sr-only {
     position: absolute;
     width: 1px;

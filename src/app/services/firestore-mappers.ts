@@ -156,6 +156,7 @@ function files(value: unknown): ReportFile[] {
       name: text(f['nombre']),
       size: typeof f['tamano'] === 'number' ? f['tamano'] : 0,
       type: text(f['tipo']),
+      ...(text(f['ruta']) ? { path: text(f['ruta']) } : {}),
     }))
     .filter((f) => f.name);
 }

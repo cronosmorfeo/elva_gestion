@@ -411,7 +411,7 @@ export class RequestsStore {
     if (this.uid) writeSeen(this.uid, now);
   }
 
-  // Files are not uploaded yet (Storage needs the Blaze plan): only their name, size and type are saved.
+  // The files are already in Backblaze B2 (services/report-files.ts); this saves their name, size, type and path.
   async sendReport(report: { week: string; text: string; files: ReportFile[] }): Promise<void> {
     const owner = await this.signedInWorker();
     await addDoc(collection(getFirestore(), COLLECTIONS.reports), {
@@ -419,7 +419,12 @@ export class RequestsStore {
       nombre: owner.name,
       semana: report.week,
       texto: report.text.trim(),
-      archivos: report.files.map((f) => ({ nombre: f.name, tamano: f.size, tipo: f.type })),
+      archivos: report.files.map((f) => ({
+        nombre: f.name,
+        tamano: f.size,
+        tipo: f.type,
+        ...(f.path ? { ruta: f.path } : {}),
+      })),
       visto: null,
       fechaEnvio: serverTimestamp(),
     });

@@ -667,6 +667,9 @@
               <span class="file-kind">{{ a.kind }}</span>
               <span class="file-name">{{ a.name }}</span>
               <span class="muted">{{ a.size }}</span>
+              @if (a.path) {
+              <button type="button" class="btn ghost small file-open" (click)="openFile(a.path)">Descargar</button>
+              }
             </li>
             }
           </ul>

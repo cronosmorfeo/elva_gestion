@@ -21,7 +21,8 @@ Internal HR app for ELVA IA. Employees request vacations and overtime; admins an
 - **Inicio:** summary of available vacation days, pending requests, new notices and this week's report, plus upcoming dates.
 - **Vacaciones** and **Horas extra:** request them with a day-by-day breakdown (weekends and Costa Rica holidays are not deducted; half days of 4 hours; overtime shows its pay rate).
 - **Mis solicitudes:** status of each request, filter by month, cancel pending or approved ones that have not started.
-- **Avisos**, **Mi reporte** (optional weekly report) and **Mi perfil** (own data and payment account, read only).
+- **Avisos**, **Mi reporte** (optional weekly report, with attachments in Backblaze B2) and **Mi perfil** (own data and payment account, read only).
+- **Passwords:** nobody else ever knows them: a new person chooses theirs from an e-mail link; change it any time (with an e-mail warning afterwards); **¿Olvidó su contraseña?** on the login sends a reset link.
 
 **Admins and HR** (`/tabs/dashboard`)
 
@@ -29,7 +30,7 @@ Internal HR app for ELVA IA. Employees request vacations and overtime; admins an
 - Vacation balance grows 1 day per full month (12 per year by default), is deducted on approval and returned if the worker cancels.
 - Manage employees and their payment accounts, publish notices and read weekly reports.
 
-Notifications reach admins (new or cancelled requests, account change requests) and workers (decisions, notices, account changes). Pending payments are not connected yet.
+Notifications reach admins (new or cancelled requests, account change requests), the jefatura (requests HR already approved) and workers (decisions, notices, account changes), by push and by e-mail to each person's address (important notices only). Pending payments are not connected yet.
 
 The session closes after 30 minutes without use, with a warning one minute before (see [Security](docs/security.md#session-timeout)).
 
@@ -37,7 +38,7 @@ The session closes after 30 minutes without use, with a warning one minute befor
 
 - **Ionic 9 + Angular 22** (standalone components, zoneless with signals)
 - **Firebase:** Authentication, Firestore and Cloud Messaging (`firebase` 12.19.0)
-- **Cloud Functions** for push notifications with the page closed (`functions/`, not deployed yet)
+- **Cloudflare Worker** for push notifications with the page closed, e-mails with **Resend** and report files (`worker/`, free plans, no card)
 - **Vitest**, **Playwright**, **ESLint** and **Prettier**
 
 ## Getting started
@@ -47,7 +48,7 @@ Requirements: **Node.js 24** (or 22.22.3+), **npm**, **Git** and a **Firebase pr
 ```bash
 git clone https://github.com/cronosmorfeo/elva_gestion.git
 cd elva_gestion
-npm ci
+npm ci --legacy-peer-deps
 ```
 
 Create the config files from the template. The app does not compile without them:
@@ -81,7 +82,17 @@ Open `http://localhost:4200`. Both environment files are in `.gitignore` and are
 5. Create a **Firestore Database**.
 6. Sign in with an `admin` account and open the dashboard: the configuration documents (`config/featureFlags` with only `vacaciones` on, and `config/seguridad` with 30 minutes) are created on their own. **Administrar sistema** turns sections on and off and has "Actualizar colecciones" to create what is missing. To add a setting, add it to `SEEDS` in `src/app/services/system-admin.ts`; every project gets it the next time the jefatura comes in (see [Security](docs/security.md#administrar-sistema-and-seeds)).
 
-Push notifications with the page closed and file uploads need the **Blaze** plan; see [`functions/README.md`](functions/README.md).
+### Publishing (Firebase Hosting, free, no card)
+
+```bash
+npx ng build --configuration production
+npx firebase-tools login
+npx firebase-tools deploy --only hosting --project <your-project-id>
+```
+
+The page goes to `https://<project-id>.web.app`. `firebase.json` sends the security headers (Content-Security-Policy, no framing, nosniff, HSTS). If your push Worker has another address, change it in the CSP `connect-src` and add the page's address to `ALLOWED_ORIGINS` in `worker/wrangler.toml`. What to configure in each service: [docs/deployment.md](docs/deployment.md).
+
+Push notifications with the page closed need the push Worker (free, no card); see [`worker/README.md`](worker/README.md). Without it, notifications only arrive while the page is open. E-mails (Resend) and report attachments (Backblaze B2) go through the same Worker. **Setting it up for a company account:** [docs/deployment.md](docs/deployment.md#automatic-vs-once-by-hand) says what is automatic and what to do once, in order.
 
 ## Scripts
 
@@ -112,20 +123,22 @@ src/app/
 ├── tab3/               # Create employee
 ├── shared/             # Labels shared by several pages
 └── services/           # Firestore data, notifications, vacation balance, payment accounts
-functions/              # Cloud Functions for push notifications
+worker/                 # Cloudflare Worker: push with the page closed, e-mails, report files
+functions/              # Same push with Cloud Functions (needs Blaze; kept as an alternative)
 docs/                   # Data model, business rules and security notes
 ```
 
 ## Documentation
 
+- [Service setup](docs/deployment.md): what to configure in Firebase, Cloudflare, Backblaze B2 and Resend.
 - [Data model](docs/modelo-de-datos.md): Firestore collections, fields and which page reads or writes each one.
 - [Business rules](docs/business-rules.md): how vacation days, overtime pay and notifications work.
 - [Security](docs/security.md): what each role may do and what is still pending.
-- [Cloud Functions](functions/README.md): push notifications and how to deploy them.
+- [Push Worker](worker/README.md): push notifications with the page closed, e-mails and report files, and how to set them up.
 
 ## Security
 
-> **The Firestore rules in this repository are open (`allow read, write: if true`) and are for development only.** Before loading real data, publish rules that restrict access by user and role. See [docs/security.md](docs/security.md).
+> **Firestore rules:** `firestore.rules` restricts access by user and role and has emulator tests in `firestore-tests/`. A pull does not publish them: each Firebase project publishes its own (`firebase deploy --only firestore:rules` or the Firebase console). See [docs/security.md](docs/security.md).
 
 Never commit credentials: `environment.ts` and `environment.prod.ts` stay local.
 

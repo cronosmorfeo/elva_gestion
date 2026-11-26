@@ -29,6 +29,15 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 - **Deactivating is final:** a deactivated account cannot sign in again and cannot be reactivated (Edit employee asks first). Its history stays. If the person is hired again, they get a new account with their data at that time; to reuse the same email, delete only the old user in Firebase Authentication (the Firestore data stays).
 - **Data retention:** the day of deactivation is saved (`colaboradores.desactivadoEl`) and the employee list shows it. All data stays (profile, payment data, requests and weekly reports); nothing is deleted. How long to keep it is still to be defined with accounting/legal (Costa Rica's data protection law, Ley 8968, asks not to keep personal data longer than needed).
 
+## Passwords
+
+- **Nobody else ever knows a person's password.** Crear empleado has no password field: the account gets a long random password nobody sees, and Firebase e-mails the person a link to choose their own. The welcome e-mail (Resend) tells them to look for it.
+- **Change it any time:** workers from **Mi perfil**, the panel from its menu (`/tabs/contrasena`). The current password is asked again; the new one needs at least 15 characters and must differ from the current one. Afterwards the person gets an e-mail "Se cambió su contraseña" (at most one every 10 minutes), so they notice if it was not them.
+- **The e-mail link** (new account or forgotten password) opens Firebase's own page. `/tabs/restablecer`, with ELVA's look, is ready for when the Firebase e-mail template can be edited (Firebase blocks it in this project; see deployment.md).
+- **¿Olvidó su contraseña?** is always visible on the login. With the e-mail typed above it, Firebase sends a link to choose a new password (Firebase's own e-mail, in Spanish). The page answers the same whether the account exists or not, and waits a minute before sending another.
+- **Password policy (Firebase):** at least 15 characters, up to 4096, no rules like "one uppercase and one number" (NIST SP 800-63B rev. 4). It applies to every new password, also on Firebase's page from the e-mail link; existing passwords keep working until changed. The Worker sets it when the jefatura opens the panel (`worker/src/auth-config.ts`).
+- Too many wrong passwords: Firebase blocks that account for a while by itself (not configurable).
+
 ## Feature flags
 
 Parts of the app can be turned off without changing the code, with booleans in Firestore at `config/featureFlags` (the jefatura turns them on and off in the dashboard, **Administrar sistema**, or in the Firebase console): `vacaciones`, `horasExtra`, `reportes`, `avisos` and `pagos`. A section that is off is hidden from the menus, Inicio and the dashboard, its page sends back to Inicio, and its notifications are not shown; Mis solicitudes only shows while vacations or overtime is on. **`vacaciones` is on by default** and every other flag is off by default: a missing flag, a missing document or a read error uses that default, so the MVP (Costa Rica) only shows vacations. Turning `vacaciones` off and `horasExtra` on shows only overtime. Defaults and the list are in `src/app/services/feature-flags.ts`.
@@ -38,6 +47,8 @@ Parts of the app can be turned off without changing the code, with booleans in F
 - Status: `pendiente`, `aprobada`, `rechazada` or `cancelada`. A request without status counts as pending.
 - Rejecting requires a reason (up to 200 characters); the worker sees it.
 - Workers can cancel pending or approved requests that have not started. Admins are notified.
+- A person cannot ask again for days they already have in a pending or approved vacation request: the page shows "Ya tiene vacaciones … No puede pedir los mismos días otra vez" and disables Enviar (`overlappingRequest` in `vacation-request/vacation-days.ts`). Rejected and cancelled requests do not count. The Firestore rules cannot check this (they cannot search other requests), so it is a page check only.
+- Only the worker cancels. RH and the jefatura reject pending requests but never cancel an approved one: the worker may already have paid for travel (decided with the company, 23 nov).
 - Pending vacations show a warning when they overlap someone else's approved vacations.
 - Approving vacations, rejecting and cancelling run in Firestore transactions, so two people acting at once cannot apply a change twice.
 
@@ -46,9 +57,20 @@ Parts of the app can be turned off without changing the code, with booleans in F
 | Who      | When                                                                                                         |
 | -------- | ------------------------------------------------------------------------------------------------------------ |
 | Admin/HR | A worker sends or cancels a request, or asks to change their payment account                                 |
+| Jefatura | HR approved a request and the final approval is missing                                                      |
 | Worker   | A request is approved or rejected (with the reason), a notice is published, or their payment account changes |
+| New hire | Their account is created (welcome; Firebase sends the link to choose a password; no "account changed")       |
 
 - Workers enable them with **Activar notificaciones** (navbar or dashboard).
 - **Page open:** the app shows an in-page card if the page is visible, or a system notification otherwise.
-- **Page closed:** Cloud Functions send a push (needs the Blaze plan; see [`functions/README.md`](../functions/README.md)).
+- **Page closed:** after each change the page tells the push Worker, which reads the document from Firestore and sends the push (see [`worker/README.md`](../worker/README.md)). When RH approves, the jefatura is told. Without `pushWorkerUrl` in `environment.ts` there is no push with the page closed.
 - Both use the same tag, so the browser shows only one. Weekly reports do not notify.
+- **E-mail:** each of these also goes by e-mail to the person's address (`colaboradores.correo`, the one they sign in with), except notices: only those marked **Importante** (Resend's free plan allows 100 e-mails a day). Nobody can turn e-mails off for now. If an e-mail fails, the push still arrives.
+
+## Weekly report attachments
+
+- Up to 5 files of at most 10 MB each: PDF, Word (`doc`, `docx`), Excel (`xls`, `xlsx`), CSV, TXT, PNG and JPG. Anything else is refused by the page and by the Worker.
+- When the report is sent, each file is uploaded to Backblaze B2 first; if one fails, the report is not saved and nothing the person wrote is lost.
+- Files stay private. The owner (in **Mi reporte**) and RH/the jefatura (in the employee's reports) can **Descargar** them; each download asks the Worker for a link that lasts 5 minutes. Coworkers never can.
+- Only while the `reportes` section is on. Without a Worker in `environment.ts` the page saves only the file names, as before.
+- **Sound:** always on (no setting; to change it, ask the developers). A short two-note chime made with the Web Audio API (`src/app/shared/chime.ts`, no sound file) plays with each notification while the page is open, also when the tab is in the background or minimized; the system notification is then silent so only one sound is heard. Browsers only allow sound after the person has clicked or typed on the page once since it opened; until then the system notification plays the system sound instead. A push with the page closed always uses the system sound.

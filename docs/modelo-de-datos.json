@@ -68,7 +68,7 @@
         "correo": {
           "tipo": "string",
           "requerido": true,
-          "descripcion": "Correo de inicio de sesión (no se edita)"
+          "descripcion": "Correo de inicio de sesión (no se edita). Es el correo personal: ahí llegan los correos de ELVA Gestión"
         },
         "tipo_colaborador": {
           "tipo": "string",
@@ -132,6 +132,11 @@
           "tipo": "number",
           "requerido": false,
           "descripcion": "Días de vacaciones que gana al año, uno por mes con 12 (por defecto 12)"
+        },
+        "devolucion": {
+          "tipo": "map",
+          "requerido": false,
+          "descripcion": "{ solicitud: id } de la última cancelación que devolvió días; las reglas lo usan para verificar la devolución"
         },
         "uid": {
           "tipo": "string",
@@ -482,7 +487,7 @@
     },
     "weekly_reports": {
       "ruta": "weekly_reports/{id}",
-      "descripcion": "Reporte semanal opcional. Los archivos todavía no se suben (Storage pide Blaze): solo se guarda su nombre.",
+      "descripcion": "Reporte semanal opcional. Los adjuntos se suben a Backblaze B2 por medio del Worker (worker/README.md) y aquí queda su ruta. Reportes enviados antes de eso solo tienen el nombre.",
       "escribe": "El trabajador crea; admin/rh llenan visto.",
       "lee": "El dueño y admin/rh, nunca compañeros.",
       "campos": {
@@ -507,9 +512,9 @@
           "descripcion": "Qué hizo"
         },
         "archivos": {
-          "tipo": "array<{ nombre, tamano, tipo }>",
+          "tipo": "array<{ nombre, tamano, tipo, ruta? }>",
           "requerido": false,
-          "descripcion": "Datos de los archivos adjuntos (no el archivo)"
+          "descripcion": "Datos de los adjuntos (máx. 5, 10 MB c/u; pdf, doc, docx, txt, xls, xlsx, csv, png, jpg). ruta = dónde está en Backblaze B2: reports/{uid}/{uuid}-{nombre}. El archivo se descarga con un permiso de 5 minutos que da el Worker al dueño o al panel."
         },
         "visto": {
           "tipo": "map | null",
@@ -531,7 +536,8 @@
           {
             "nombre": "conciliacion.xlsx",
             "tamano": 48213,
-            "tipo": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "tipo": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "ruta": "reports/Kx81fLq2/0f8fad5b-d9cb-469f-a165-70867728950e-conciliacion.xlsx"
           }
         ],
         "visto": null,
@@ -597,8 +603,7 @@
   "todaviaNoEnFirestore": {
     "pagos": "Pagos pendientes del panel: datos de ejemplo (admin-sample-data.ts). Se conectan cuando RH pase el Excel de planilla.",
     "actividad": "Actividad reciente del panel: solo en memoria, se borra al recargar. Propuesta: colección actividad (solo crear).",
-    "revisionRh": "Ya está en Firestore para vacaciones y horas extra (aprobacionRh). rhReviewed siempre es true y ya no se usa para decidir.",
-    "archivosDeReportes": "Firebase Storage (pide plan Blaze)."
+    "revisionRh": "Ya está en Firestore para vacaciones y horas extra (aprobacionRh). rhReviewed siempre es true y ya no se usa para decidir."
   },
   "calculadosSinGuardar": {
     "feriados": "costaRicaHolidays() en vacation-request/holidays.ts, cualquier año",
@@ -679,7 +684,8 @@
     "dashboard.reportes": {
       "fuente": ["weekly_reports"],
       "acciones": {
-        "Marcar como visto": "visto = { por, fecha }"
+        "Marcar como visto": "visto = { por, fecha }",
+        "Descargar": "pide al Worker un permiso de 5 minutos (/files/open) y descarga el adjunto de Backblaze B2"
       }
     },
     "dashboard.avisos": {
@@ -697,22 +703,27 @@
   },
   "notificaciones": {
     "admin": "solicitud nueva o cancelada de vacaciones/horas extra; pedido de cambio de cuenta",
+    "jefatura": "RH aprobó una solicitud y falta la aprobación final",
+    "contrasena": "al cambiar su contraseña en la página: correo 'Se cambió su contraseña' solo a esa persona (máx. uno cada 10 minutos)",
+    "nuevoEmpleado": "al crear su cuenta: correo de bienvenida (Resend) + enlace de Firebase para crear su contraseña; nadie más la conoce. Guardar la cuenta de pago al crearlo no avisa 'se cambió su cuenta'",
     "trabajador": "su solicitud fue aprobada o rechazada (con motivo); aviso nuevo; su cuenta de pago cambió",
-    "comoLlegan": "Con la página abierta: la muestra la propia página. Con la página cerrada: Cloud Functions en functions/ (no desplegadas, necesitan Blaze)."
+    "comoLlegan": "Con la página abierta: la muestra la propia página. Con la página cerrada: después de cada cambio la página avisa al Worker de Cloudflare (worker/), que lee el documento en Firestore y manda el push con FCM. Sin pushWorkerUrl en environment.ts no hay push con la página cerrada.",
+    "correo": "El mismo Worker manda cada aviso también por correo (Resend) a colaboradores.correo de las mismas personas, salvo los avisos que no son Importante. Si falta RESEND_API_KEY, solo push.",
+    "pushLog": "push_log/{clave}: lo crea solo el Worker (cuenta de servicio) para no mandar dos veces el mismo aviso. Sin regla de Firestore: la página no lo puede leer ni escribir."
   },
   "reglasFirestore": {
-    "estadoActual": "ABIERTAS: allow read, write: if true. Hay que cambiarlas antes de usar datos reales.",
+    "estadoActual": "Escritas en firestore.rules (todo cerrado salvo lo de cada rol; siempre exigen un colaborador activo) con pruebas en firestore-tests/. Cada proyecto de Firebase las publica; un pull no las publica.",
     "rolAdmin": "get(colaboradores/{request.auth.uid}).tipo_colaborador in ['admin','rh'] && activo == true",
-    "colaboradores": "lee el dueño o admin; escribe admin; solo admin (jefatura) cambia tipo_colaborador o desactiva a un admin; nadie cambia su propio tipo_colaborador, activo ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
+    "colaboradores": "lee el dueño o admin; escribe admin; solo admin (jefatura) cambia tipo_colaborador o desactiva a un admin; nadie cambia su propio tipo_colaborador, activo, salario ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
     "privado/pago": "lee el dueño o admin; escribe admin, nunca sobre su propia cuenta",
     "bank_change_requests": "crea el dueño con estado pendiente; lee el dueño o admin; actualiza admin",
     "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin/rh deciden (en vacaciones y horas extra: rh solo escribe aprobacionRh y admin solo aprobacionJefatura; estado aprobada solo junto con aprobacionJefatura)",
     "config/featureFlags": "lee cualquier colaborador activo; escribe solo admin (jefatura)",
     "config/seguridad": "lee cualquier colaborador activo; escribe solo admin (jefatura)",
-    "devolucionDeDias": "Hoy el navegador del trabajador devuelve los días al cancelar. La regla solo debe permitir sumar decision.diasDescontados de esa solicitud, o hacerlo en una Cloud Function.",
+    "devolucionDeDias": "El navegador del trabajador devuelve los días al cancelar y guarda colaboradores.devolucion = { solicitud: id }. La regla solo lo deja en la misma escritura que cancela esa solicitud aprobada, por exactamente su decision.diasDescontados y antes de que empiece.",
     "weekly_reports": "crea el dueño con visto == null; lee dueño o admin; admin cambia visto",
     "notices": "lee cualquiera con sesión; escribe admin",
-    "users/{uid}/fcmTokens": "cada usuario escribe y borra solo los suyos"
+    "users/{uid}/fcmTokens": "cada colaborador activo guarda solo los suyos; borrarlos solo pide la propia sesión"
   },
   "nombresFrontendAFirestore": {
     "ownerId": "uid",

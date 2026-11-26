@@ -1,5 +1,7 @@
 # Push notifications (Cloud Functions)
 
+> **In use: the Cloudflare Worker in [`worker/`](../worker/README.md)**, which needs no card. These Cloud Functions do the same with Firestore triggers and are kept as an alternative if the project moves to the Blaze plan. Do not run both, or each change is sent twice.
+
 These functions send push notifications when the ELVA Gestión page is closed. While the page is open, the app already shows notifications by itself; these add the case where it is closed.
 
 | Function               | When                                                                   | Who gets it                       |

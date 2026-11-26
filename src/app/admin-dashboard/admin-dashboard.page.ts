@@ -1123,7 +1123,8 @@ export class AdminDashboardPage {
         policy === 'unavailable' ? 'No se pudo revisar la política de contraseñas (Worker); revisá la consola.' : '',
       ].filter(Boolean);
       this.systemMessage.set(parts.length ? parts.join(' ') : 'Todo estaba al día. No se cambió nada.');
-      if (r.created.length || r.completed.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
+      if (r.created.length || r.completed.length)
+        this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
     } catch (err) {
       this.systemError.set(this.systemProblem(err));
     } finally {

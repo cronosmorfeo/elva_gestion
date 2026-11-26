@@ -49,9 +49,10 @@ Whoever creates an account never knows its password: Crear empleado creates it w
 - **Own payment account and role:** blocked by the page and by the rules.
 - **Feature flags only hide:** a section that is off is hidden and its page redirects, but its data can still be read or written directly in Firestore within each role's rules. If a feature must be really off, the rules have to block it too.
 - **Deactivated accounts:** the rules block them (only their own `colaboradores` document stays readable) and nobody can set `activo` back to `true`, but their Firebase Authentication user still exists; disable it in Authentication too.
-- **Push test page** (`/tabs/tab2`) signs in anonymously; the rules give an anonymous session nothing, but remove the page and disable anonymous sign-in in Firebase before going live.
+- **Push test page** (`/tabs/tab2`): removed. Keep anonymous sign-in off in Firebase.
 - **Self-registration:** Crear empleado creates users from the browser, so sign-up stays open in Firebase Authentication. The rules give such an account nothing; creating users with a Cloud Function would let sign-up be turned off.
-- **Self-approval:** the jefatura can approve their own requests. Not blocked (decided with the company, 23 nov).
+- **Self-approval:** the jefatura can approve their own requests and RH can review their own. Not blocked (decided with the company, 23 and 26 nov).
+- **Names in requests:** the name and e-mail saved in a request (`nombreSolicitante`, `correoSolicitante`, `nombre`) are typed by the worker's browser and the rules do not check them. The dashboard shows the owner's own name from `colaboradores` (by `uid`) instead (`admin-dashboard/owner-names.ts`), and approving always deducts from the owner by `uid`. The Worker's e-mails and push to the panel still use the typed name: to fix it, the Worker should read the owner's `colaboradores` document.
 - **No `console.log`:** it can print personal data in the browser. ESLint (`no-console`) only allows `console.warn` and `console.error`.
 - **Notifications** must not include sensitive data, because they show on the lock screen.
 - **Login messages:** a wrong e-mail and a wrong password show the same message, so the page does not tell which accounts exist. Firebase Authentication must also have **Email enumeration protection** on (console → Authentication → Settings; on by default in new projects), or its API still tells.

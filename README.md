@@ -135,6 +135,7 @@ docs/                   # Data model, business rules and security notes
 - [Data model](docs/modelo-de-datos.md): Firestore collections, fields and which page reads or writes each one.
 - [Business rules](docs/business-rules.md): how vacation days, overtime pay and notifications work.
 - [Security](docs/security.md): what each role may do and what is still pending.
+- [Security review, Nov 2026](docs/security-review-2026-11.md): what was scanned and checked, what was fixed and what was ruled out.
 - [Push Worker](worker/README.md): push notifications with the page closed, e-mails and report files, and how to set them up.
 
 ## Security

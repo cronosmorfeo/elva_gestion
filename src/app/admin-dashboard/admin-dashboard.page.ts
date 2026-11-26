@@ -67,6 +67,7 @@ import {
 import type { Approver } from './decisions';
 import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
 import { myMenuLinks } from './my-menu';
+import { withOwnerNames } from './owner-names';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
@@ -180,8 +181,8 @@ export class AdminDashboardPage {
   readonly profileInitials = computed(() => initials(this.profileName() || 'Admin'));
 
   // Live from Firestore, shared with the worker pages, so decisions show up in "Mis solicitudes".
-  readonly vacations = this.store.vacations;
-  readonly overtime = this.store.overtime;
+  readonly vacations = computed(() => withOwnerNames(this.store.vacations(), (r) => r.ownerId, this.employees()));
+  readonly overtime = computed(() => withOwnerNames(this.store.overtime(), (r) => r.ownerId, this.employees()));
 
   // Notices for every worker. Admins create, edit and delete them.
   readonly maxNoticeTitle = MAX_NOTICE_TITLE;
@@ -831,7 +832,7 @@ export class AdminDashboardPage {
 
   // Requests from workers to change their payment account. The admin agrees the new one by Slack.
   readonly bankRequests = computed(() =>
-    this.store.bankRequests().map((r) => ({
+    withOwnerNames(this.store.bankRequests(), (r) => r.uid, this.employees()).map((r) => ({
       ...r,
       sent: r.sentAt ? `Enviada el ${formatShortDate(r.sentAt)}, ${formatTime(r.sentAt)}` : '',
     })),

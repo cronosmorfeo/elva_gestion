@@ -9,14 +9,26 @@ What to configure in each service so the page works with everything in this repo
 **Once per company account, by hand** (keys and account settings cannot travel in the code). In this order:
 
 1. **Firebase:** publish the Firestore rules; Authentication with only Email/Password, Anonymous off, e-mail enumeration protection on; copy the web config and the VAPID key into `src/environments/environment.ts` and `environment.prod.ts` (not in git). Details below.
-2. **Cloudflare Worker** ([worker/README.md](../worker/README.md)): in `worker/wrangler.toml` replace the test values with the company's: `FIREBASE_PROJECT_ID`, `ALLOWED_ORIGINS` (the page addresses), `B2_ENDPOINT`, `B2_BUCKET`, `MAIL_FROM`, `APP_URL`. Save the secrets `FIREBASE_SERVICE_ACCOUNT`, `B2_KEY_ID`, `B2_APPLICATION_KEY` and `RESEND_API_KEY`, then `npx wrangler deploy` and copy the Worker address.
-3. **Page:** put that address in `pushWorkerUrl` (both environment files) and in the `connect-src` of the Content-Security-Policy in [`firebase.json`](../firebase.json) (it has the test Worker's address), then build and publish Hosting.
-4. **Backblaze B2:** private bucket, a key limited to it, and the CORS rules with the page addresses (below).
-5. **Resend:** API key with Sending access, the company domain verified, a DMARC record, and `MAIL_FROM` with an address of that domain (below).
-6. **Open the panel as the jefatura** (step "automatic" above) and turn on the sections in **Administrar sistema**.
+2. **Backblaze B2:** private bucket, a key limited to it, and the CORS rules with the page addresses (below).
+3. **Resend:** API key with Sending access, the company domain verified, a DMARC record, and `MAIL_FROM` with an address of that domain (below).
+4. **Cloudflare Worker** ([worker/README.md](../worker/README.md)): in `worker/wrangler.toml` replace the test values with the company's: `FIREBASE_PROJECT_ID`, `ALLOWED_ORIGINS` (the page addresses), `B2_ENDPOINT`, `B2_BUCKET`, `MAIL_FROM`, `APP_URL`. Save the secrets `FIREBASE_SERVICE_ACCOUNT`, `B2_KEY_ID`, `B2_APPLICATION_KEY` and `RESEND_API_KEY`, then `npx wrangler deploy` and copy the Worker address.
+5. **Page:** put that address in `pushWorkerUrl` (both environment files) and in the `connect-src` of the Content-Security-Policy in [`firebase.json`](../firebase.json) (it has the test Worker's address), then build and publish Hosting.
+6. **First jefatura account** (only in a project with no `admin` yet, see [below](#first-jefatura-account)), then **open the panel as the jefatura** (step "automatic" above) and turn on the sections in **Administrar sistema**. Vacations and overtime need an HR **and** a jefatura approval, so keep at least one active `rh` and one active `admin` account.
 7. **Recommended:** restrict the browser API key (below), and use a company domain such as `gestion.elvaai.com` (**Hosting > Add custom domain**, then add it to **Authentication > Settings > Authorized domains**, to `ALLOWED_ORIGINS` and as `APP_URL` in the Worker). The test address `elva-gestion.web.app` belongs to a developer's own Firebase project and cannot be moved to another one.
 
 The [Checklist](#checklist) at the end repeats this to tick off.
+
+## After each update (pull)
+
+A `git pull` only updates the code on your computer; it publishes nothing. After pulling, publish what changed:
+
+| Changed in the pull | Publish                                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `firestore.rules`   | Run the rules tests (below), then `npx firebase-tools deploy --only firestore:rules --project <project-id>` |
+| `worker/`           | `cd worker`, `npm install --legacy-peer-deps`, `npx wrangler deploy`                                        |
+| `src/` (the page)   | `npm ci --legacy-peer-deps`, then the Hosting commands (below)                                              |
+
+When a change touches more than one (for example the approval flow: rules, Worker and page), publish all of them together: the new page with the old rules, or the other way round, can fail. Each pull request says what to publish.
 
 ## Firebase
 
@@ -27,9 +39,17 @@ The [Checklist](#checklist) at the end repeats this to tick off.
 - **Settings > Password policy:** nothing to do. The Worker sets it (at least 15 characters, no composition rules) the first time the jefatura opens the panel, and **Administrar sistema > Actualizar colecciones** checks it again. To confirm, look there: **Enforce**, minimum 15. If the Worker is not deployed yet, set it by hand with those values.
 - **Templates > Password reset (optional):** the e-mail with the link to choose a password (new accounts and "¿Olvidó su contraseña?"). It works as it comes, from `noreply@<project-id>.firebaseapp.com` with Firebase's own page, so tell people to check spam. If Firebase lets you edit it (it blocked it in the test project), set a Spanish subject such as "Cree o cambie su contraseña de ELVA Gestión" and **Customize action URL** → `https://<project-id>.web.app/tabs/restablecer`, the page's own screen with ELVA's look. Another way, without the console: the Worker creates the link (`accounts:sendOobCode` with `returnOobLink`) and sends it with Resend (not done yet). A custom domain must be in **Settings > Authorized domains** for the link to work.
 
+### First jefatura account
+
+New accounts are created from the panel, and only an `admin` can open it, so in a project with no `admin` yet the first one is made by hand:
+
+1. **Authentication > Users > Add user:** the person's e-mail and a temporary password. Copy its **User UID**.
+2. **Firestore Database > Data:** in `colaboradores`, add a document whose ID is that UID, with `nombre` (string), `correo` (string, the same e-mail), `activo` (boolean `true`) and `tipo_colaborador` (string `admin`).
+3. Sign in with it, open the panel and change the password in **Mi menú > Mi perfil** (at least 15 characters). From then on, create everyone else, including RH, with **Crear empleado**, and give them their type with **Editar**. Another admin can later fill in this first account's salary and vacation balance (nobody edits their own).
+
 ### Firestore rules
 
-Publish [`firestore.rules`](../firestore.rules): **Firestore Database > Rules**, paste the file and **Publish** (or `npx firebase-tools deploy --only firestore:rules --project <project-id>`). A pull does not publish them.
+Publish [`firestore.rules`](../firestore.rules): `npx firebase-tools deploy --only firestore:rules --project <project-id>`, or **Firestore Database > Rules**, paste the file and **Publish**. A pull does not publish them.
 
 Existing data must fit the rules, or that person loses access: every `colaboradores/{uid}` needs `activo: true` (boolean) and `tipo_colaborador` exactly `regular`, `rh` or `admin` (lowercase; missing counts as `regular`).
 
@@ -76,6 +96,7 @@ Without `RESEND_API_KEY` everything else works; notifications only go by push.
 - [ ] Firestore rules published and data checked (`activo`, `tipo_colaborador`).
 - [ ] `worker/wrangler.toml` with the company's values (not the test ones) and the four Worker secrets saved.
 - [ ] The company Worker address in `pushWorkerUrl` and in `firebase.json` (`connect-src`).
+- [ ] A first `admin` account (if the project had none), at least one active `rh` and one active `admin`.
 - [ ] Panel opened once as the jefatura: sections on, password policy 15 (Authentication > Settings).
 - [ ] Anonymous sign-in off, email enumeration protection on.
 - [ ] VAPID key and `pushWorkerUrl` in both environment files.

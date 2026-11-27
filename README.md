@@ -81,7 +81,7 @@ Open `http://localhost:4200`. Both environment files are in `.gitignore` and are
 3. In **Project settings > Cloud Messaging > Web Push certificates**, generate a key and copy it into `firebaseVapidKey`.
 4. In **Authentication > Sign-in method**, enable **Email/Password**.
 5. Create a **Firestore Database**.
-6. Sign in with an `admin` account and open the dashboard: the configuration documents (`config/featureFlags` with only `vacaciones` on, and `config/seguridad` with 30 minutes) are created on their own. **Administrar sistema** turns sections on and off and has "Actualizar colecciones" to create what is missing. To add a setting, add it to `SEEDS` in `src/app/services/system-admin.ts`; every project gets it the next time the jefatura comes in (see [Security](docs/security.md#administrar-sistema-and-seeds)).
+6. Sign in with an `admin` account (in a new project, create the first one by hand: [First jefatura account](docs/deployment.md#first-jefatura-account)) and open the dashboard: the configuration documents (`config/featureFlags` with only `vacaciones` on, and `config/seguridad` with 30 minutes) are created on their own. **Administrar sistema** turns sections on and off and has "Actualizar colecciones" to create what is missing. To add a setting, add it to `SEEDS` in `src/app/services/system-admin.ts`; every project gets it the next time the jefatura comes in (see [Security](docs/security.md#administrar-sistema-and-seeds)).
 
 ### Publishing (Firebase Hosting, free, no card)
 

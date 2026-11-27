@@ -33,10 +33,11 @@ describe('my requests', () => {
     expect(statusText('cancelada', true)).toBe('Cancelada');
   });
 
-  it('says when RH approved and the jefatura is missing', () => {
+  it('says which of the two approvals is missing', () => {
     const r = vacation('a', 'me', '2026-11-10T08:00');
     expect(pendingText(r)).toBe('Pendiente');
     expect(pendingText({ ...r, rhApprovedBy: 'uidKatia' })).toBe('Pendiente · falta la jefatura');
+    expect(pendingText({ ...r, bossApprovedBy: 'uidFelix' })).toBe('Pendiente · falta RH');
   });
 
   it('shows only my vacations, newest first', () => {

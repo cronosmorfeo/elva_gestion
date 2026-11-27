@@ -3,12 +3,19 @@ import type { RequestStatus, VacationRequest } from './admin-requests';
 
 export const MAX_REASON = 200;
 
-// Vacations are approved by the jefatura (role admin: Félix or Vanessa, either one); that approval is final.
-// RH (role rh) can approve first as a check, but the jefatura does not have to wait for it.
-// Either RH or the jefatura can reject it, and that is final too.
+// Vacations and overtime need two approvals: RH (role rh) and the jefatura (role admin, any of them), in any
+// order. Only the second one approves the request (and deducts the vacation days). Either RH or the
+// jefatura can reject it, and that is final.
 export type Approver = 'rh' | 'jefatura';
 
 export const APPROVAL_FIELDS: Record<Approver, string> = { rh: 'aprobacionRh', jefatura: 'aprobacionJefatura' };
+
+// Message after the first of the two approvals.
+export function partialText(as: Approver): string {
+  return as === 'rh'
+    ? 'Aprobación de RH guardada. Falta la jefatura.'
+    : 'Aprobación de la jefatura guardada. Falta RH.';
+}
 
 // Which approval an account gives, or null if it gives none.
 export function approverOf(tipo: unknown): Approver | null {

@@ -1,5 +1,13 @@
 import type { VacationRequest } from './admin-requests';
-import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
+import {
+  MAX_REASON,
+  approvalText,
+  approverOf,
+  editPermissions,
+  partialText,
+  reasonProblem,
+  vacationConflicts,
+} from './decisions';
 
 const vac = (
   id: string,
@@ -27,6 +35,13 @@ describe('vacation approvals', () => {
     expect(approvalText('rechazada', 'Katia Mora', '')).toBe('Aprobó Katia');
     expect(approvalText('rechazada', '', '')).toBe('—');
     expect(approvalText('cancelada', '', '')).toBe('—');
+  });
+});
+
+describe('partialText', () => {
+  it('says which approval is still missing', () => {
+    expect(partialText('rh')).toBe('Aprobación de RH guardada. Falta la jefatura.');
+    expect(partialText('jefatura')).toBe('Aprobación de la jefatura guardada. Falta RH.');
   });
 });
 

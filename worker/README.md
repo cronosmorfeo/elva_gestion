@@ -17,7 +17,8 @@ With the page open, the app already shows notifications by itself; the Worker ad
 | ------------------------------------ | ------------------------ | --------------------------- |
 | New vacation or overtime request     | Active admin and rh      | `vacaciones` / `horasExtra` |
 | RH approved, the jefatura has not    | Active admin (jefatura)  | same                        |
-| Request approved (final) or rejected | The worker               | same                        |
+| The jefatura approved, RH has not    | Active RH                | same                        |
+| Request approved (both) or rejected  | The worker               | same                        |
 | Request cancelled by the worker      | Active admin and rh      | same                        |
 | Payment account change request       | Active admin and rh      | `pagos`                     |
 | Payment account changed by the panel | That worker              | `pagos`                     |

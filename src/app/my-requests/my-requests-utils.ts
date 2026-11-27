@@ -87,9 +87,12 @@ export function statusText(status: RequestStatus, rhReviewed: boolean): string {
   return rhReviewed ? 'Pendiente' : 'Pendiente · en revisión de RH';
 }
 
-// A pending request (vacations or overtime) waits for the jefatura; the worker sees when RH already approved it.
+// A pending request (vacations or overtime) needs RH's and the jefatura's approval, in any order; the worker
+// sees which one is still missing once the other is in.
 export function pendingText(r: Approvals): string {
-  return r.rhApprovedBy ? 'Pendiente · falta la jefatura' : 'Pendiente';
+  if (r.rhApprovedBy && !r.bossApprovedBy) return 'Pendiente · falta la jefatura';
+  if (r.bossApprovedBy && !r.rhApprovedBy) return 'Pendiente · falta RH';
+  return 'Pendiente';
 }
 
 function sentText(sentAt?: string): string {

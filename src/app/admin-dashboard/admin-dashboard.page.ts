@@ -65,7 +65,15 @@ import {
   vacationDays,
 } from './admin-requests';
 import type { Approver } from './decisions';
-import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
+import {
+  MAX_REASON,
+  approvalText,
+  approverOf,
+  editPermissions,
+  partialText,
+  reasonProblem,
+  vacationConflicts,
+} from './decisions';
 import { myMenuLinks } from './my-menu';
 import { withOwnerNames } from './owner-names';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
@@ -193,8 +201,6 @@ export class AdminDashboardPage {
     return f ? noticeProblem(f) : '';
   });
   readonly confirmDeleteId = signal<string | null>(null);
-  // The jefatura confirms before approving a vacation that RH has not approved yet.
-  readonly confirmApproveId = signal<string | null>(null);
   readonly confirmDeactivate = signal(false);
 
   // "Administrar sistema" (only the jefatura): feature flags and the configuration seeds.
@@ -302,7 +308,7 @@ export class AdminDashboardPage {
     const approvedOt = ot.filter((r) => r.status === 'aprobada');
     return {
       pendingVacations: pendingVac.length,
-      waitingJefatura: pendingVac.length === 1 ? 'espera a la jefatura' : 'esperan a la jefatura',
+      waitingJefatura: pendingVac.length === 1 ? 'espera aprobación' : 'esperan aprobación',
       approvedVacations: approvedVac.length,
       approvedVacationDays: dayCount(approvedVac.reduce((sum, r) => sum + vacationDays(r), 0)),
       pendingOvertime: pendingOt.length,
@@ -337,7 +343,6 @@ export class AdminDashboardPage {
     rh: ApprovalCell;
     jefatura: ApprovalCell;
     canDecide: boolean;
-    needsConfirm: boolean;
     waiting: string;
   } {
     const name = (uid?: string): string => this.employees().find((e) => e.id === uid)?.name ?? '';
@@ -353,8 +358,7 @@ export class AdminDashboardPage {
       rh: { text: rh, tone: tone(rh) },
       jefatura: { text: jefatura, tone: tone(jefatura) },
       canDecide: pending && !!as && !mine,
-      needsConfirm: as === 'jefatura' && !r.rhApprovedBy,
-      waiting: pending && as === 'rh' && mine ? 'Falta la jefatura' : '',
+      waiting: pending && mine ? (as === 'rh' ? 'Falta la jefatura' : 'Falta RH') : '',
     };
   }
 
@@ -497,7 +501,6 @@ export class AdminDashboardPage {
   async decideVacation(id: string, status: RequestStatus): Promise<void> {
     const request = this.vacations().find((r) => r.id === id);
     const as = this.approver();
-    this.confirmApproveId.set(null);
     if (!request || !as) return;
     if (status === 'rechazada') {
       this.openReject('vacaciones', id, request.employee);
@@ -520,8 +523,8 @@ export class AdminDashboardPage {
     }
     if (result.kind === 'parcial') {
       await this.log(
-        `${this.profileName() || 'Vos'} aprobó las vacaciones de ${request.employee} (RH)`,
-        'Aprobación de RH guardada. Falta la jefatura.',
+        `${this.profileName() || 'Vos'} aprobó las vacaciones de ${request.employee} (${as === 'rh' ? 'RH' : 'jefatura'})`,
+        partialText(as),
       );
       return;
     }
@@ -541,7 +544,6 @@ export class AdminDashboardPage {
   async decideOvertime(id: string, status: RequestStatus): Promise<void> {
     const request = this.overtime().find((r) => r.id === id);
     const as = this.approver();
-    this.confirmApproveId.set(null);
     if (!request || !as) return;
     if (status === 'rechazada') {
       this.openReject('horas', id, request.employee);
@@ -562,8 +564,8 @@ export class AdminDashboardPage {
     }
     if (result === 'parcial') {
       await this.log(
-        `${this.profileName() || 'Vos'} aprobó las horas extra de ${request.employee} (RH)`,
-        'Aprobación de RH guardada. Falta la jefatura.',
+        `${this.profileName() || 'Vos'} aprobó las horas extra de ${request.employee} (${as === 'rh' ? 'RH' : 'jefatura'})`,
+        partialText(as),
       );
       return;
     }

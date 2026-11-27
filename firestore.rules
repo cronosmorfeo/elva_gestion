@@ -63,22 +63,27 @@ service cloud.firestore {
       return resource.data.get('estado', 'pendiente') == 'pendiente';
     }
 
-    // ---------- Decisions (vacations and overtime): RH reviews, the jefatura decides, either rejects ----------
+    // ---------- Decisions (vacations and overtime): RH and the jefatura both approve, either rejects ----------
+
+    // Both approvals are needed, RH's and the jefatura's, in any order. The first one only adds its own field;
+    // the second one also approves the request (estado 'aprobada' and decision).
+    function approves(mine, other) {
+      return isPending()
+        && !(mine in resource.data)
+        && stamped(request.resource.data[mine])
+        && ((!(other in resource.data) && changed().hasOnly([mine]))
+          || ((other in resource.data)
+            && changed().hasOnly([mine, 'estado', 'decision'])
+            && request.resource.data.estado == 'aprobada'
+            && stamped(request.resource.data.decision)));
+    }
 
     function rhApproves() {
-      return isRh() && isPending()
-        && !('aprobacionRh' in resource.data)
-        && changed().hasOnly(['aprobacionRh'])
-        && stamped(request.resource.data.aprobacionRh);
+      return isRh() && approves('aprobacionRh', 'aprobacionJefatura');
     }
 
     function bossApproves() {
-      return isAdmin() && isPending()
-        && !('aprobacionJefatura' in resource.data)
-        && changed().hasOnly(['aprobacionJefatura', 'estado', 'decision'])
-        && request.resource.data.estado == 'aprobada'
-        && stamped(request.resource.data.aprobacionJefatura)
-        && stamped(request.resource.data.decision);
+      return isAdmin() && approves('aprobacionJefatura', 'aprobacionRh');
     }
 
     function rejects() {
@@ -186,10 +191,11 @@ service cloud.firestore {
         && request.resource.data.diasSolicitados <= 366
         && request.resource.data.fechaSolicitud == request.time;
 
-      allow update: if rhApproves()
-        || (bossApproves()
-            && request.resource.data.decision.get('diasDescontados', -1) is number
-            && request.resource.data.decision.get('diasDescontados', -1) >= 0)
+      // The final approval says how many days it deducted (decision.diasDescontados).
+      allow update: if ((rhApproves() || bossApproves())
+            && (request.resource.data.get('estado', 'pendiente') != 'aprobada'
+              || (request.resource.data.decision.get('diasDescontados', -1) is number
+                && request.resource.data.decision.get('diasDescontados', -1) >= 0)))
         || rejects()
         || ownerCancels(crTime(resource.data.diaInicio, '00:00'));
 

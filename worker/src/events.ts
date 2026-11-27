@@ -11,7 +11,7 @@ export const NEW_EMPLOYEE = 'colaboradores'; // colaboradores/{uid}, right after
 export const PASSWORD_CHANGED = 'contrasena'; // the person changed their own password; the id is their uid
 
 export type Role = 'regular' | 'rh' | 'admin';
-export type Audience = { panel: true } | { jefatura: true } | { workers: true } | { uid: string };
+export type Audience = { panel: true } | { jefatura: true } | { rh: true } | { workers: true } | { uid: string };
 
 export interface PushMessage {
   tag: string;
@@ -90,8 +90,8 @@ function requestPush(collection: string, id: string, r: Data, caller: Caller, fl
   const what = vacation ? `vacaciones ${vacationDates(r)}` : `horas extra ${overtimeTime(r)}`;
   const tag = `${collection}-${id}-${estado}`;
 
-  // New request (nobody reviewed it yet): the panel hears about it. Only its owner reports it.
-  if (estado === 'pendiente' && !r['aprobacionRh'] && caller.uid === owner) {
+  // New request (nobody approved it yet): the panel hears about it. Only its owner reports it.
+  if (estado === 'pendiente' && !r['aprobacionRh'] && !r['aprobacionJefatura'] && caller.uid === owner) {
     return {
       to: { panel: true },
       key: tag,
@@ -105,7 +105,21 @@ function requestPush(collection: string, id: string, r: Data, caller: Caller, fl
     };
   }
 
-  // RH approved it and the final word is the jefatura's: they hear about it. Only RH reports it.
+  // Both approvals are needed. When one side approved it, the other hears about it; only the approver reports it.
+  if (estado === 'pendiente' && r['aprobacionJefatura'] && !r['aprobacionRh'] && caller.role === 'admin') {
+    const bossTag = `${collection}-${id}-jefatura`;
+    return {
+      to: { rh: true },
+      key: bossTag,
+      email: true,
+      message: {
+        tag: bossTag,
+        title: 'Solicitud lista para RH',
+        body: `${who(r)} pide ${what}. La jefatura ya la aprobó; falta RH.`,
+        url: '/tabs/dashboard',
+      },
+    };
+  }
   if (estado === 'pendiente' && r['aprobacionRh'] && !r['aprobacionJefatura'] && caller.role === 'rh') {
     const rhTag = `${collection}-${id}-rh`;
     return {

@@ -11,7 +11,7 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 - **Earning days (confirmed by HR):** 12 days a year for everyone, earned **one per full month** (`colaboradores.diasAnuales`, default 12; it can be changed per employee in Edit employee). Days are earned from the day the balance is entered in the app (`colaboradores.acumulaDesde`), so days earned before are not counted twice. Other yearly amounts are rounded down to half days.
 - **Balance today** = `colaboradores.vacaciones_disponibles` (entered balance minus what was used) + days earned since `acumulaDesde`. Admins set today's balance in Edit employee; the app stores the part that makes the total match. New employees get the days they already have when they are created. Workers without a balance cannot request vacations.
 - **Available to request** = balance − days of pending requests (never below 0).
-- **Who decides:** the jefatura (role `admin`: Félix or Vanessa, either one) gives the final approval (`aprobacionJefatura`): it approves the request and deducts the days. RH (role `rh`) can approve first as a check (`aprobacionRh`); the request stays `pendiente` until the jefatura decides. The jefatura does not have to wait for RH: if RH has not approved yet, the dashboard asks to confirm. Either RH or the jefatura can reject it, and that is final (`decision.rol` says which). The dashboard shows an RH column and a Jefatura column.
+- **Who decides:** a request needs **two approvals**, RH's (role `rh`, `aprobacionRh`) and the jefatura's (role `admin`, any of them, `aprobacionJefatura`), **in any order** (decided with the company, 27 nov). The first one is saved and the request stays `pendiente`; the second one approves it and deducts the days, whoever gives it. Either RH or the jefatura can reject it, and that is final (`decision.rol` says which). The dashboard shows an RH column and a Jefatura column.
 - **Requests from the panel:** admins and HR ask for their own vacations and overtime from **Mi menú** in the dashboard, with the same flow. Nobody is blocked from deciding their own request (company decision: people in the panel usually agree it beforehand); the panel, including the person who asked, gets the usual notification.
 - **Approving** deducts the days in a transaction and is blocked if the balance is not enough. The days deducted are saved in the request (`decision.diasDescontados`).
 - **Cancelling** an approved vacation that has not started returns those same days.
@@ -23,7 +23,7 @@ How ELVA Gestión calculates vacation days, overtime pay and who gets notified. 
 - Sundays and mandatory holidays pay **double** up to an 8-hour shift, then **triple**. Whether Saturday is also a rest day is _pending HR_ (`REST_WEEKDAYS` in `overtime-request/overtime-hours.ts`).
 - Shift plus overtime cannot exceed **12 hours a day**: up to 4 overtime hours on a workday, up to 12 on a rest day.
 - A request can cover up to one year.
-- **Who decides:** the same as vacations. RH can approve first as a check (`aprobacionRh`); the jefatura (role `admin`) gives the final approval (`aprobacionJefatura`), with a confirmation if RH has not approved yet. Either can reject (`decision.rol`). There is no balance to deduct.
+- **Who decides:** the same as vacations: RH's and the jefatura's approval, in any order; the second one approves it. Either can reject (`decision.rol`). There is no balance to deduct.
 
 ## Employees
 
@@ -58,13 +58,14 @@ Parts of the app can be turned off without changing the code, with booleans in F
 | Who      | When                                                                                                         |
 | -------- | ------------------------------------------------------------------------------------------------------------ |
 | Admin/HR | A worker sends or cancels a request, or asks to change their payment account                                 |
-| Jefatura | HR approved a request and the final approval is missing                                                      |
+| Jefatura | HR approved a request and the jefatura's approval is missing                                                 |
+| HR       | The jefatura approved a request and HR's approval is missing                                                 |
 | Worker   | A request is approved or rejected (with the reason), a notice is published, or their payment account changes |
 | New hire | Their account is created (welcome; Firebase sends the link to choose a password; no "account changed")       |
 
 - Workers enable them with **Activar notificaciones** (navbar or dashboard).
 - **Page open:** the app shows an in-page card if the page is visible, or a system notification otherwise.
-- **Page closed:** after each change the page tells the push Worker, which reads the document from Firestore and sends the push (see [`worker/README.md`](../worker/README.md)). When RH approves, the jefatura is told. Without `pushWorkerUrl` in `environment.ts` there is no push with the page closed.
+- **Page closed:** after each change the page tells the push Worker, which reads the document from Firestore and sends the push (see [`worker/README.md`](../worker/README.md)). After the first of the two approvals, the other side is told. Without `pushWorkerUrl` in `environment.ts` there is no push with the page closed.
 - Both use the same tag, so the browser shows only one. Weekly reports do not notify.
 - **E-mail:** each of these also goes by e-mail to the person's address (`colaboradores.correo`, the one they sign in with), except notices: only those marked **Importante** (Resend's free plan allows 100 e-mails a day). Nobody can turn e-mails off for now. If an e-mail fails, the push still arrives.
 

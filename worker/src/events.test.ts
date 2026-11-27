@@ -53,11 +53,28 @@ describe('requests', () => {
     expect(push?.to).toEqual({ jefatura: true });
     expect(push?.key).toBe('vacations_requests-v1-rh');
     expect(push?.email).toBe(true);
-    expect(push?.message.body).toBe('Ana Solís pide vacaciones del 14 dic al 20 dic. RH ya la aprobó; falta la jefatura.');
+    expect(push?.message.body).toBe(
+      'Ana Solís pide vacaciones del 14 dic al 20 dic. RH ya la aprobó; falta la jefatura.',
+    );
     // Not the owner, not the jefatura, and not once the jefatura already decided.
     expect(pushFor(VACATIONS, 'v1', reviewed, ana, {})).toBeNull();
     expect(pushFor(VACATIONS, 'v1', reviewed, boss, {})).toBeNull();
     expect(pushFor(VACATIONS, 'v1', { ...reviewed, aprobacionJefatura: { por: 'felix' } }, rh, {})).toBeNull();
+  });
+
+  it("the jefatura's approval tells RH when RH has not approved yet, reported only by the jefatura", () => {
+    const first = vacation({ estado: 'pendiente', aprobacionJefatura: { por: 'felix' } });
+    const push = pushFor(VACATIONS, 'v1', first, boss, {});
+    expect(push?.to).toEqual({ rh: true });
+    expect(push?.key).toBe('vacations_requests-v1-jefatura');
+    expect(push?.email).toBe(true);
+    expect(push?.message.body).toBe(
+      'Ana Solís pide vacaciones del 14 dic al 20 dic. La jefatura ya la aprobó; falta RH.',
+    );
+    // Not RH, not the owner (no "new request" again), and not once RH already approved.
+    expect(pushFor(VACATIONS, 'v1', first, rh, {})).toBeNull();
+    expect(pushFor(VACATIONS, 'v1', first, ana, {})).toBeNull();
+    expect(pushFor(VACATIONS, 'v1', { ...first, aprobacionRh: { por: 'katia' } }, boss, {})).toBeNull();
   });
 
   it('a decision goes to the worker, reported only by the panel', () => {

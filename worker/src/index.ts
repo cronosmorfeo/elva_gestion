@@ -221,6 +221,7 @@ function matches(to: Audience, uid: string, role: Role): boolean {
   if ('uid' in to) return to.uid === uid;
   if ('panel' in to) return isPanel(role);
   if ('jefatura' in to) return role === 'admin';
+  if ('rh' in to) return role === 'rh';
   return role === 'regular';
 }
 

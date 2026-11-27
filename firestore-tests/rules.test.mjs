@@ -61,12 +61,36 @@ beforeEach(async () => {
       estado: 'aprobada',
       decision: { por: 'felix', diasDescontados: 1 },
     });
+    await f.doc('vacations_requests/conRh').set({
+      uid: 'ana',
+      diaInicio: '2099-04-06',
+      diaFin: '2099-04-07',
+      diasSolicitados: 1,
+      estado: 'pendiente',
+      aprobacionRh: { por: 'katia' },
+    });
+    await f.doc('vacations_requests/conJefatura').set({
+      uid: 'ana',
+      diaInicio: '2099-04-13',
+      diaFin: '2099-04-14',
+      diasSolicitados: 1,
+      estado: 'pendiente',
+      aprobacionJefatura: { por: 'felix' },
+    });
     await f
       .doc('vacations_requests/deLuis')
       .set({ uid: 'luis', diaInicio: '2099-03-02', diaFin: '2099-03-03', diasSolicitados: 1, estado: 'pendiente' });
     await f
       .doc('overtime_requests/he')
       .set({ uid: 'ana', inicio: '2099-01-10T17:00', fin: '2099-01-10T19:00', tarea: 'Respaldo', estado: 'pendiente' });
+    await f.doc('overtime_requests/heJefatura').set({
+      uid: 'ana',
+      inicio: '2099-01-17T17:00',
+      fin: '2099-01-17T19:00',
+      tarea: 'Respaldo',
+      estado: 'pendiente',
+      aprobacionJefatura: { por: 'felix' },
+    });
     await f
       .doc('notices/n1')
       .set({ titulo: 'Hola', mensaje: 'x', importante: false, autor: 'Félix', autorUid: 'felix' });
@@ -238,33 +262,55 @@ describe('vacation requests', () => {
     await assertSucceeds(db('katia').collection('vacations_requests').get());
   });
 
-  it('RH approves first without deciding; RH cannot give the final approval', async () => {
+  it('the first approval, RH or the jefatura, only adds its own; it cannot approve alone', async () => {
     await assertSucceeds(
       db('katia')
         .doc('vacations_requests/pend')
         .update({ aprobacionRh: { por: 'katia', fecha: now() } }),
     );
-    await assertFails(
-      db('katia')
+    await assertSucceeds(
+      db('felix')
         .doc('vacations_requests/deLuis')
-        .update({
-          estado: 'aprobada',
-          aprobacionJefatura: { por: 'katia', fecha: now() },
-          decision: { por: 'katia', fecha: now(), diasDescontados: 1 },
-        }),
+        .update({ aprobacionJefatura: { por: 'felix', fecha: now() } }),
+    );
+    await assertFails(
+      db('felix')
+        .doc('vacations_requests/conJefatura')
+        .update({ aprobacionJefatura: { por: 'felix', fecha: now() } }),
     );
   });
 
-  it('the jefatura gives the final approval and deducts in the same write', async () => {
-    const r = db('felix');
-    const batch = r.batch();
-    batch.update(r.doc('vacations_requests/pend'), {
+  it('nobody approves it alone: without the other approval there is no final approval', async () => {
+    const final = (by, field) => ({
+      estado: 'aprobada',
+      [field]: { por: by, fecha: now() },
+      decision: { por: by, fecha: now(), diasDescontados: 1 },
+    });
+    await assertFails(db('felix').doc('vacations_requests/pend').update(final('felix', 'aprobacionJefatura')));
+    await assertFails(db('katia').doc('vacations_requests/pend').update(final('katia', 'aprobacionRh')));
+    await assertFails(db('katia').doc('vacations_requests/conRh').update(final('katia', 'aprobacionJefatura')));
+  });
+
+  it('the second approval, in any order, approves and deducts in the same write', async () => {
+    const boss = db('felix');
+    const afterRh = boss.batch();
+    afterRh.update(boss.doc('vacations_requests/conRh'), {
       estado: 'aprobada',
       aprobacionJefatura: { por: 'felix', fecha: now() },
       decision: { por: 'felix', fecha: now(), diasDescontados: 1 },
     });
-    batch.update(r.doc('colaboradores/ana'), { vacaciones_disponibles: 4 });
-    await assertSucceeds(batch.commit());
+    afterRh.update(boss.doc('colaboradores/ana'), { vacaciones_disponibles: 4 });
+    await assertSucceeds(afterRh.commit());
+
+    const rh = db('katia');
+    const afterBoss = rh.batch();
+    afterBoss.update(rh.doc('vacations_requests/conJefatura'), {
+      estado: 'aprobada',
+      aprobacionRh: { por: 'katia', fecha: now() },
+      decision: { por: 'katia', fecha: now(), diasDescontados: 1 },
+    });
+    afterBoss.update(rh.doc('colaboradores/ana'), { vacaciones_disponibles: 3 });
+    await assertSucceeds(afterBoss.commit());
   });
 
   it('a worker cannot approve, and nobody signs for someone else', async () => {
@@ -380,7 +426,7 @@ describe('vacation requests', () => {
 });
 
 describe('overtime requests', () => {
-  it('a worker asks for their own; the jefatura approves; RH only reviews', async () => {
+  it('a worker asks for their own; RH and the jefatura both approve', async () => {
     await assertSucceeds(
       db('ana').collection('overtime_requests').add({
         uid: 'ana',
@@ -405,6 +451,27 @@ describe('overtime requests', () => {
           estado: 'aprobada',
           aprobacionJefatura: { por: 'felix', fecha: now() },
           decision: { por: 'felix', fecha: now() },
+        }),
+    );
+  });
+
+  it('overtime: the jefatura can go first, and then RH gives the second approval', async () => {
+    await assertFails(
+      db('felix')
+        .doc('overtime_requests/he')
+        .update({
+          estado: 'aprobada',
+          aprobacionJefatura: { por: 'felix', fecha: now() },
+          decision: { por: 'felix', fecha: now() },
+        }),
+    );
+    await assertSucceeds(
+      db('katia')
+        .doc('overtime_requests/heJefatura')
+        .update({
+          estado: 'aprobada',
+          aprobacionRh: { por: 'katia', fecha: now() },
+          decision: { por: 'katia', fecha: now() },
         }),
     );
   });

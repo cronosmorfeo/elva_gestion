@@ -49,7 +49,7 @@
       "admin": "Administrador"
     },
     "rolesDelPanel": ["admin", "rh"],
-    "decidenVacaciones": "La jefatura (rol admin: Félix o Vanessa, cualquiera) da la aprobación final y se descuentan los días. RH (rol rh) puede aprobar antes como revisión; sigue pendiente hasta la jefatura, que no tiene que esperarla (la página pide confirmar). RH o la jefatura pueden rechazar, y eso es final.",
+    "decidenVacaciones": "Hacen falta dos aprobaciones, en cualquier orden: RH (rol rh) y la jefatura (rol admin, cualquiera). La primera deja la solicitud pendiente; la segunda la aprueba y descuenta los días. RH o la jefatura pueden rechazar, y eso es final.",
     "transacciones": "Aprobar vacaciones, rechazar y cancelar usan transacciones de Firestore: si dos personas actúan a la vez, el saldo cambia una sola vez y no se pisa una decisión.",
     "nombresDeColecciones": "Las colecciones de solicitudes, avisos y reportes están en inglés (como vacations_requests, que creó Andrey); los campos, en español."
   },
@@ -318,7 +318,7 @@
         "decision": {
           "tipo": "map",
           "requerido": false,
-          "descripcion": "{ por, fecha, diasDescontados } al aprobar (lo pone la jefatura); { por, fecha, motivo, rol } al rechazar (rol: rh o jefatura)"
+          "descripcion": "{ por, fecha, diasDescontados } al aprobar (lo pone quien da la segunda aprobación); { por, fecha, motivo, rol } al rechazar (rol: rh o jefatura)"
         },
         "aprobacionRh": {
           "tipo": "map",
@@ -328,7 +328,7 @@
         "aprobacionJefatura": {
           "tipo": "map",
           "requerido": false,
-          "descripcion": "{ por, fecha }: aprobación final de la jefatura (Félix o Vanessa)"
+          "descripcion": "{ por, fecha }: aprobación de la jefatura (cualquier admin)"
         },
         "cancelacion": {
           "tipo": "map",
@@ -356,7 +356,7 @@
     "overtime_requests": {
       "ruta": "overtime_requests/{id}",
       "descripcion": "Una por pedido de horas extra (antes de trabajarlas).",
-      "escribe": "El trabajador crea y puede cancelar; rh aprueba primero (opcional), la jefatura (admin) da la aprobación final y cualquiera rechaza. Igual que vacaciones.",
+      "escribe": "El trabajador crea y puede cancelar; rh y la jefatura (admin) aprueban los dos, en cualquier orden (la segunda aprobación la aprueba) y cualquiera rechaza. Igual que vacaciones.",
       "lee": "El dueño y admin/rh.",
       "campos": {
         "uid": {
@@ -403,7 +403,7 @@
         "decision": {
           "tipo": "map",
           "requerido": false,
-          "descripcion": "{ por, fecha } al aprobar (lo pone la jefatura); { por, fecha, motivo, rol } al rechazar (rol: rh o jefatura)"
+          "descripcion": "{ por, fecha } al aprobar (lo pone quien da la segunda aprobación); { por, fecha, motivo, rol } al rechazar (rol: rh o jefatura)"
         },
         "aprobacionRh": {
           "tipo": "map",
@@ -413,7 +413,7 @@
         "aprobacionJefatura": {
           "tipo": "map",
           "requerido": false,
-          "descripcion": "{ por, fecha }: aprobación final de la jefatura (Félix o Vanessa)"
+          "descripcion": "{ por, fecha }: aprobación de la jefatura (cualquier admin)"
         },
         "cancelacion": {
           "tipo": "map",
@@ -655,7 +655,7 @@
     "dashboard.aprobarVacaciones": {
       "fuente": ["vacations_requests", "colaboradores (saldo)"],
       "acciones": {
-        "Aprobar": "transacción. RH: guarda aprobacionRh y sigue pendiente. Jefatura: guarda aprobacionJefatura, estado = aprobada, decision con diasDescontados, resta el saldo (no aprueba si no alcanza; si RH no aprobó, pide confirmar)",
+        "Aprobar": "transacción. La primera aprobación (RH o jefatura) guarda su campo y sigue pendiente. La segunda guarda su campo, estado = aprobada, decision con diasDescontados y resta el saldo (no aprueba si no alcanza).",
         "Rechazar": "transacción: estado = rechazada, decision con motivo (obligatorio) y rol (rh o jefatura)"
       },
       "muestra": "buscar por nombre/correo, filtro por mes, pestañas por estado, aviso de choques"
@@ -663,7 +663,7 @@
     "dashboard.horasExtra": {
       "fuente": ["overtime_requests"],
       "acciones": {
-        "Aprobar": "transacción. RH: guarda aprobacionRh y sigue pendiente. Jefatura: guarda aprobacionJefatura, estado = aprobada y decision (si RH no aprobó, pide confirmar)",
+        "Aprobar": "transacción. La primera aprobación (RH o jefatura) guarda su campo y sigue pendiente. La segunda guarda su campo, estado = aprobada y decision.",
         "Rechazar": "transacción con motivo y rol (rh o jefatura)"
       }
     },
@@ -703,7 +703,8 @@
   },
   "notificaciones": {
     "admin": "solicitud nueva o cancelada de vacaciones/horas extra; pedido de cambio de cuenta",
-    "jefatura": "RH aprobó una solicitud y falta la aprobación final",
+    "jefatura": "RH aprobó una solicitud y falta la aprobación de la jefatura",
+    "rh": "La jefatura aprobó una solicitud y falta la aprobación de RH",
     "contrasena": "al cambiar su contraseña en la página: correo 'Se cambió su contraseña' solo a esa persona (máx. uno cada 10 minutos)",
     "nuevoEmpleado": "al crear su cuenta: correo de bienvenida (Resend) + enlace de Firebase para crear su contraseña; nadie más la conoce. Guardar la cuenta de pago al crearlo no avisa 'se cambió su cuenta'",
     "trabajador": "su solicitud fue aprobada o rechazada (con motivo); aviso nuevo; su cuenta de pago cambió",
@@ -717,7 +718,7 @@
     "colaboradores": "lee el dueño o admin; escribe admin; solo admin (jefatura) cambia tipo_colaborador o desactiva a un admin; nadie cambia su propio tipo_colaborador, activo, salario ni vacaciones_disponibles (salvo la devolución de una cancelación, ver abajo)",
     "privado/pago": "lee el dueño o admin; escribe admin, nunca sobre su propia cuenta",
     "bank_change_requests": "crea el dueño con estado pendiente; lee el dueño o admin; actualiza admin",
-    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin/rh deciden (en vacaciones y horas extra: rh solo escribe aprobacionRh y admin solo aprobacionJefatura; estado aprobada solo junto con aprobacionJefatura)",
+    "vacations_requests y overtime_requests": "crea el dueño con uid == request.auth.uid y sin estado/decision; lee dueño o admin; el dueño solo puede pasar a cancelada; admin/rh deciden (en vacaciones y horas extra: rh solo escribe aprobacionRh y admin solo aprobacionJefatura; estado aprobada solo con la segunda de las dos aprobaciones)",
     "config/featureFlags": "lee cualquier colaborador activo; escribe solo admin (jefatura)",
     "config/seguridad": "lee cualquier colaborador activo; escribe solo admin (jefatura)",
     "devolucionDeDias": "El navegador del trabajador devuelve los días al cancelar y guarda colaboradores.devolucion = { solicitud: id }. La regla solo lo deja en la misma escritura que cancela esa solicitud aprobada, por exactamente su decision.diasDescontados y antes de que empiece.",

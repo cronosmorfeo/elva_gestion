@@ -227,8 +227,8 @@ export class RequestsStore {
     reportChange(name, id);
   }
 
-  // RH's approval is a check before the jefatura: it is saved and the request stays pending.
-  // The jefatura's approval is final (with or without RH's): it approves and deducts the days from
+  // A request needs both approvals, RH's and the jefatura's, in any order. The first one is saved and the
+  // request stays pending; the second approves it and deducts the days from
   // colaboradores/{uid}.vacaciones_disponibles in one transaction, so everything is saved or nothing is,
   // and two people approving at once only deduct once.
   async approveVacation(id: string, ownerUid: string | undefined, days: number, as: Approver): Promise<ApproveResult> {
@@ -244,7 +244,7 @@ export class RequestsStore {
       const field = APPROVAL_FIELDS[as];
       if (data[field]) throw new ApproveError('ya-aprobo');
       const approval = { por: this.uid, fecha: serverTimestamp() };
-      if (as === 'rh') {
+      if (!data[APPROVAL_FIELDS[as === 'rh' ? 'jefatura' : 'rh']]) {
         tx.update(requestRef, { [field]: approval });
         return { kind: 'parcial' };
       }
@@ -265,7 +265,7 @@ export class RequestsStore {
       });
       return check.kind === 'descontar' ? { kind: 'descontado', next: check.next } : { kind: 'sin-saldo' };
     });
-    // RH's review tells the jefatura; the final approval tells the worker.
+    // The first approval tells the other side; the second one tells the worker.
     reportChange(COLLECTIONS.vacations, id);
     return result;
   }
@@ -356,9 +356,8 @@ export class RequestsStore {
     if (notify) reportChange('pago', uid);
   }
 
-  // Same flow as vacations, without a balance: RH's approval is saved and the request stays pending;
-  // the jefatura's approval is final, with or without RH's. One transaction, so two people approving
-  // at once cannot overwrite each other or a cancellation.
+  // Same flow as vacations, without a balance: both approvals in any order; the second one approves it.
+  // One transaction, so two people approving at once cannot overwrite each other or a cancellation.
   async approveOvertime(id: string, as: Approver): Promise<'parcial' | 'aprobada'> {
     const db = getFirestore();
     const ref = doc(db, COLLECTIONS.overtime, id);
@@ -372,7 +371,7 @@ export class RequestsStore {
       const field = APPROVAL_FIELDS[as];
       if (data[field]) throw new ApproveError('ya-aprobo');
       const approval = { por: this.uid, fecha: serverTimestamp() };
-      if (as === 'rh') {
+      if (!data[APPROVAL_FIELDS[as === 'rh' ? 'jefatura' : 'rh']]) {
         tx.update(ref, { [field]: approval });
         return 'parcial';
       }

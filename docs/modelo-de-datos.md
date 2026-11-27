@@ -40,7 +40,7 @@ El modelo completo está en **`modelo-de-datos.json`**, en esta misma carpeta. E
 - `colaboradores.correo` es el correo personal con el que la persona inicia sesión; ahí le llegan los correos de ELVA Gestión (Resend, desde el Worker).
 - `estado` puede ser `pendiente`, `aprobada`, `rechazada` o `cancelada`. Si falta, cuenta como pendiente.
 - No se guarda lo que se puede calcular (feriados, horas, pago 1.5x/doble/triple, choques, antigüedad), salvo los días descontados, que quedan en la solicitud para poder devolverlos al cancelar.
-- Vacaciones y horas extra se aprueban igual: RH puede aprobar primero (`aprobacionRh`, sigue pendiente) y la jefatura da la aprobación final (`aprobacionJefatura`). Cualquiera rechaza.
+- Vacaciones y horas extra se aprueban igual: hacen falta las dos aprobaciones, RH (`aprobacionRh`) y jefatura (`aprobacionJefatura`), en cualquier orden. La primera deja la solicitud pendiente; la segunda la aprueba (y descuenta los días). Cualquiera rechaza.
 - Aprobar, rechazar y cancelar usan transacciones: si dos personas actúan a la vez, el saldo cambia una sola vez.
 
 ## Pendiente

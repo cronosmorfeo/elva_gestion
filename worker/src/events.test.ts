@@ -12,6 +12,7 @@ import {
   pushFor,
   roleOf,
   vacationDates,
+  withOwnerName,
 } from './events';
 
 const ana = { uid: 'ana', role: 'regular' as const };
@@ -201,5 +202,31 @@ describe('helpers', () => {
     expect(vacationDates({ diaInicio: '2026-12-14', diaFin: '2026-12-15', medioDiaDesde: '07:00' })).toBe(
       'el 14 dic, medio día',
     );
+  });
+});
+
+describe('owner name', () => {
+  it("uses the owner's own name and e-mail, not the ones typed in the request", () => {
+    const fake = { uid: 'luis', nombreSolicitante: 'Ana Solís', correoSolicitante: 'ana@elva.ai', nombre: 'Ana Solís' };
+    const fixed = withOwnerName(fake, { nombre: 'Luis Mora', correo: 'luis@elva.ai' });
+    expect(fixed).toMatchObject({
+      nombreSolicitante: 'Luis Mora',
+      nombre: 'Luis Mora',
+      correoSolicitante: 'luis@elva.ai',
+    });
+    const push = pushFor(
+      VACATIONS,
+      'v1',
+      { ...vacation({ estado: 'pendiente' }), ...fixed },
+      { uid: 'luis', role: 'regular' },
+      {},
+    );
+    expect(push?.message.body).toContain('Luis Mora pide');
+  });
+
+  it('keeps the request as it is when the owner has no name', () => {
+    const r = { uid: 'ana', nombreSolicitante: 'Ana' };
+    expect(withOwnerName(r, null)).toBe(r);
+    expect(withOwnerName(null, { nombre: 'Ana' })).toBeNull();
   });
 });

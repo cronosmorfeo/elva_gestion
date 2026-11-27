@@ -11,7 +11,7 @@ Scope: `main` at `67f90e3` plus the Mi menú changes: the page (`src/`), the Clo
    - Path: `firestore-mappers.ts` → `employee` → dashboard lists, approval and reject windows, "De vacaciones esta semana", account change requests.
    - Impact: a worker could send a request under a coworker's name, so the panel approves it believing it is someone else's. Days are still deducted from the real owner (by `uid`), and "Editar cuenta" opens the real owner, so no balance or account moves to another person.
    - Fix: the dashboard takes the name and e-mail from the owner's `colaboradores` record by `uid` (`admin-dashboard/owner-names.ts`, with a test).
-   - Still open: the Worker's push and e-mail to the panel use the typed name (`worker/src/events.ts`, `who()`). Fixing it means reading the owner's `colaboradores` document in the Worker and deploying it again.
+   - The Worker's push and e-mail to the panel also use the owner's name from `colaboradores` (`withOwnerName` in `worker/src/events.ts`, 27 Nov).
 
 ## Checked by hand
 
@@ -27,9 +27,13 @@ Scope: `main` at `67f90e3` plus the Mi menú changes: the page (`src/`), the Clo
 - **npm audit / OSV**: `@grpc/grpc-js` through `firebase` (Node only, the browser does not use gRPC); `eslint`, `glob`, `minimatch`, `rimraf` and `typescript-eslint` (development tools only); `firestore-tests/` (local emulator only). Worker: none.
 - **Semgrep (45)**: `window.location.href = url` in `report-files.ts` (the URL comes from the Worker, signed for Backblaze; not user input), `alert()` in `tab3`, HTML in template strings in `mail.ts` (values escaped), `ROUTES[pathname]` (a pathname always starts with `/`, so no prototype keys), test keys, style warnings in `functions/`.
 
+## Still open (found 27 Nov, not fixed)
+
+- **[Medium, insider] Approving without deducting the days.** The second approval writes `decision.diasDescontados` and lowers the owner's balance in the same batch, but the rules do not check that the balance goes down by exactly that number, or at all. Someone in the panel (jefatura, or HR since both approvals are needed) could approve without deducting. Fix: in `firestore.rules`, require that an approval to `aprobada` comes with `colaboradores/{uid}.vacaciones_disponibles` lowered by `diasDescontados` (`getAfter`), plus rules tests.
+- **[Low] Deactivating someone does not disable their Firebase account (S8).** The rules and the Worker already refuse them, but the account can still sign in. Fix: when **Activo** is turned off, the page calls the Worker, and the Worker disables the user in Authentication.
+
 ## Hardening still pending (not vulnerabilities)
 
-- Disable the Firebase Authentication user when someone is deactivated (today the rules and the Worker already block them).
 - Restrict the browser API key in Google Cloud (`docs/deployment.md`).
 - Create users from the server and close self-registration (S1), MFA for the panel (S6), App Check (S5).
 - Check vacation balances in the rules with `request.time`.

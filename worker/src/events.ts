@@ -278,6 +278,14 @@ function reasonText(r: Data): string {
   return r['estado'] === 'rechazada' && typeof motivo === 'string' && motivo ? ` Motivo: ${motivo}` : '';
 }
 
+// The name and e-mail in a request are typed by the worker's browser. The messages use the ones in the owner's
+// own colaboradores document instead, so nobody can send a request under a coworker's name.
+export function withOwnerName(r: Data | null, owner: Data | null): Data | null {
+  const name = text(owner?.['nombre']);
+  if (!r || !name) return r;
+  return { ...r, nombreSolicitante: name, nombre: name, correoSolicitante: text(owner?.['correo']) };
+}
+
 function who(r: Data): string {
   return text(r['nombreSolicitante']) || text(r['correoSolicitante']) || 'Un trabajador';
 }

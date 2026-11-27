@@ -45,12 +45,26 @@
             <span>{{ profileRole() || 'Administración' }}</span>
           </div>
         </div>
-        @if (notifyState() === 'off') {
+        <button
+          type="button"
+          class="logout my-menu-btn"
+          aria-controls="my-menu"
+          [attr.aria-expanded]="myMenuOpen()"
+          (click)="toggleMyMenu()"
+        >
+          Mi menú <span aria-hidden="true">{{ myMenuOpen() ? '▴' : '▾' }}</span>
+        </button>
+        @if (myMenuOpen()) {
+        <nav id="my-menu" class="my-menu" aria-label="Mi menú">
+          @for (link of myLinks(); track link.path) {
+          <button type="button" class="menu-item" (click)="openMine(link.path)">{{ link.label }}</button>
+          }
+        </nav>
+        } @if (notifyState() === 'off') {
         <button type="button" class="logout" (click)="enableNotifications()">Activar notificaciones</button>
         } @if (approver() === 'jefatura') {
         <button type="button" class="logout" (click)="openSystem()">Administrar sistema</button>
         }
-        <button type="button" class="logout" (click)="changePassword()">Cambiar contraseña</button>
         <button type="button" class="logout" (click)="logout()">Cerrar sesión</button>
       </div>
     </aside>

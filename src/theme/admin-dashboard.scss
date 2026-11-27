@@ -193,6 +193,27 @@ $danger: #8a2420;
     }
   }
 
+  // "Mi menú": the worker pages for the person using the panel.
+  .my-menu-btn {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .my-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: -6px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.12);
+
+    .menu-item {
+      padding: 8px 10px;
+      font-size: 0.9rem;
+    }
+  }
+
   .main {
     flex: 1 1 auto;
     min-width: 0;
@@ -1039,6 +1060,8 @@ $danger: #8a2420;
       flex-direction: row;
       align-items: center;
       padding: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
 
       .person div {
         display: none;
@@ -1048,6 +1071,12 @@ $danger: #8a2420;
     .logout {
       padding: 7px 10px;
       font-size: 0.82rem;
+    }
+
+    .my-menu {
+      order: 10;
+      flex: 1 0 100%;
+      margin-top: 0;
     }
   }
 

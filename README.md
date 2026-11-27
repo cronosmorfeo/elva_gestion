@@ -29,6 +29,7 @@ Internal HR app for ELVA IA. Employees request vacations and overtime; admins an
 - Approve or reject requests (a reason is required), with search, month filter and a warning when vacations overlap. For vacations and overtime, HR can approve first and the jefatura (role `admin`) gives the final approval.
 - Vacation balance grows 1 day per full month (12 per year by default), is deducted on approval and returned if the worker cancels.
 - Manage employees and their payment accounts, publish notices and read weekly reports.
+- **Mi menú:** admins and HR are workers too; it opens the worker pages (Inicio, Vacaciones, Horas extra, Mi reporte, Mis solicitudes, Avisos, Mi perfil) for their own requests, only the sections that are on. Their requests go through the same approval as anyone else's.
 
 Notifications reach admins (new or cancelled requests, account change requests), the jefatura (requests HR already approved) and workers (decisions, notices, account changes), by push and by e-mail to each person's address (important notices only). Pending payments are not connected yet.
 
@@ -134,6 +135,7 @@ docs/                   # Data model, business rules and security notes
 - [Data model](docs/modelo-de-datos.md): Firestore collections, fields and which page reads or writes each one.
 - [Business rules](docs/business-rules.md): how vacation days, overtime pay and notifications work.
 - [Security](docs/security.md): what each role may do and what is still pending.
+- [Security review, Nov 2026](docs/security-review-2026-11.md): what was scanned and checked, what was fixed and what was ruled out.
 - [Push Worker](worker/README.md): push notifications with the page closed, e-mails and report files, and how to set them up.
 
 ## Security

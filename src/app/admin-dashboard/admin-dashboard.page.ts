@@ -66,6 +66,8 @@ import {
 } from './admin-requests';
 import type { Approver } from './decisions';
 import { MAX_REASON, approvalText, approverOf, editPermissions, reasonProblem, vacationConflicts } from './decisions';
+import { myMenuLinks } from './my-menu';
+import { withOwnerNames } from './owner-names';
 import { ALL_MONTHS, matchesRequest, requestMonths } from './request-filter';
 
 interface Employee {
@@ -158,6 +160,9 @@ export class AdminDashboardPage {
   readonly notifyState = this.notifications.state;
   readonly flags = this.featureFlags.flags;
   readonly sections = computed(() => SECTIONS.filter((s) => !s.flag || this.flags()[s.flag]));
+  // "Mi menú": the worker pages for the person using the panel (their own vacations, overtime...).
+  readonly myLinks = computed(() => myMenuLinks(this.flags()));
+  readonly myMenuOpen = signal(false);
   readonly roleOptions = ROLE_OPTIONS;
   readonly countryOptions = COUNTRY_OPTIONS;
   readonly currencyOptions = CURRENCY_OPTIONS;
@@ -176,8 +181,8 @@ export class AdminDashboardPage {
   readonly profileInitials = computed(() => initials(this.profileName() || 'Admin'));
 
   // Live from Firestore, shared with the worker pages, so decisions show up in "Mis solicitudes".
-  readonly vacations = this.store.vacations;
-  readonly overtime = this.store.overtime;
+  readonly vacations = computed(() => withOwnerNames(this.store.vacations(), (r) => r.ownerId, this.employees()));
+  readonly overtime = computed(() => withOwnerNames(this.store.overtime(), (r) => r.ownerId, this.employees()));
 
   // Notices for every worker. Admins create, edit and delete them.
   readonly maxNoticeTitle = MAX_NOTICE_TITLE;
@@ -827,7 +832,7 @@ export class AdminDashboardPage {
 
   // Requests from workers to change their payment account. The admin agrees the new one by Slack.
   readonly bankRequests = computed(() =>
-    this.store.bankRequests().map((r) => ({
+    withOwnerNames(this.store.bankRequests(), (r) => r.uid, this.employees()).map((r) => ({
       ...r,
       sent: r.sentAt ? `Enviada el ${formatShortDate(r.sentAt)}, ${formatTime(r.sentAt)}` : '',
     })),
@@ -1066,8 +1071,13 @@ export class AdminDashboardPage {
     destroyRef.onDestroy(() => clearTimeout(timer));
   }
 
-  changePassword(): void {
-    void this.router.navigateByUrl('/tabs/contrasena');
+  toggleMyMenu(): void {
+    this.myMenuOpen.update((open) => !open);
+  }
+
+  openMine(path: string): void {
+    this.myMenuOpen.set(false);
+    void this.router.navigateByUrl(path);
   }
 
   openSystem(): void {
@@ -1114,7 +1124,8 @@ export class AdminDashboardPage {
         policy === 'unavailable' ? 'No se pudo revisar la política de contraseñas (Worker); revisá la consola.' : '',
       ].filter(Boolean);
       this.systemMessage.set(parts.length ? parts.join(' ') : 'Todo estaba al día. No se cambió nada.');
-      if (r.created.length || r.completed.length) this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
+      if (r.created.length || r.completed.length)
+        this.addActivity(`${this.profileName() || 'Vos'} actualizó las colecciones`);
     } catch (err) {
       this.systemError.set(this.systemProblem(err));
     } finally {

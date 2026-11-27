@@ -31,6 +31,7 @@ import {
   isPanel,
   pushFor,
   roleOf,
+  withOwnerName,
   type Audience,
   type Flags,
   type Push,
@@ -56,7 +57,9 @@ export interface Env {
 
 const COLLECTIONS = new Set([VACATIONS, OVERTIME, NOTICES, BANK_REQUESTS, BANK_ACCOUNT, NEW_EMPLOYEE, PASSWORD_CHANGED]);
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
-// The free plan allows 50 outside requests per call; about 8 go to Google before sending.
+// Requests whose messages name the person who asked.
+const REQUESTS = new Set([VACATIONS, OVERTIME, BANK_REQUESTS]);
+// The free plan allows 50 outside requests per call; about 9 go to Google before sending.
 // The e-mails take one more (a single batch call).
 const MAX_SENDS = 35;
 
@@ -170,7 +173,12 @@ async function notify(request: Request, env: Env): Promise<{ sent: number; maile
       : collection === PASSWORD_CHANGED
         ? `colaboradores/${id}`
         : `${collection}/${id}`; // NEW_EMPLOYEE is colaboradores itself
-  const [data, flags] = await Promise.all([db.get(path), db.get('config/featureFlags')]);
+  const [request_, flags] = await Promise.all([db.get(path), db.get('config/featureFlags')]);
+  const owner = request_?.['uid'];
+  const data =
+    REQUESTS.has(collection) && typeof owner === 'string' && ID.test(owner)
+      ? withOwnerName(request_, await db.get(`colaboradores/${owner}`))
+      : request_;
   const push = pushFor(collection, id, data, me, (flags ?? {}) as Flags);
   if (!push) return { sent: 0, mailed: 0 };
 

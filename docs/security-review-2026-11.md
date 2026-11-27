@@ -11,7 +11,7 @@ Scope: `main` at `67f90e3` plus the Mi menú changes: the page (`src/`), the Clo
    - Path: `firestore-mappers.ts` → `employee` → dashboard lists, approval and reject windows, "De vacaciones esta semana", account change requests.
    - Impact: a worker could send a request under a coworker's name, so the panel approves it believing it is someone else's. Days are still deducted from the real owner (by `uid`), and "Editar cuenta" opens the real owner, so no balance or account moves to another person.
    - Fix: the dashboard takes the name and e-mail from the owner's `colaboradores` record by `uid` (`admin-dashboard/owner-names.ts`, with a test).
-   - Still open: the Worker's push and e-mail to the panel use the typed name (`worker/src/events.ts`, `who()`). Fixing it means reading the owner's `colaboradores` document in the Worker and deploying it again.
+   - The Worker's push and e-mail to the panel also use the owner's name from `colaboradores` (`withOwnerName` in `worker/src/events.ts`, 27 Nov).
 
 ## Checked by hand
 
